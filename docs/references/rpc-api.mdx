@@ -1,0 +1,166 @@
+---
+title: "RPC API Reference"
+description: "The validator's HTTP API: conventions, core endpoints, and error codes"
+icon: tower-broadcast
+---
+
+## Overview
+
+Every validator can serve an HTTP API (default devnet port `4000`, set by `rpc_port` in the validator config). The `cowboy` CLI and SDKs are wrappers over this API; anything they do, you can do with plain HTTP.
+
+```bash
+curl http://localhost:4000/height
+# {"height": 12345}
+```
+
+<Tip>
+  With `COWBOY_DEV_MODE` set on the node, a Swagger UI is served at `/swagger-ui` and the machine-readable spec at `/api-docs/openapi.json`. That spec is the exhaustive, always-current endpoint list; this page covers the conventions and the endpoints developers use most.
+</Tip>
+
+## Conventions
+
+- **Addresses** are 20-byte hex strings (`0x`-prefixed accepted). Invalid addresses return `400`.
+- **Pagination**: list endpoints take `offset` and `limit` query params (`limit` defaults to 50, capped at 1,000) and return `total_count` with the echoed `offset`/`limit`; the actor storage/mailbox endpoints use cursor pagination (`next_cursor`).
+- **Rate limits**: global sliding window (default 100 req/s, `RPC_GLOBAL_RATE_LIMIT_PER_SEC`); the faucet is limited separately (default 5 req/min). Exceeding returns `429`.
+- **Errors** are JSON with an HTTP status plus a numeric code (table below).
+- **Body size**: requests are capped at 1 MB globally; `/submit` and `/submit_wait` enforce a tighter 512 KB.
+- **Amounts** (balances, fees) are integers in CBY base units (1 CBY = 10⁹).
+
+## Transactions
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/submit` | POST | Submit a batch of signed transactions |
+| `/submit_wait` | POST | Submit and block until receipts are available (timeout 100–10,000 ms) |
+| `/transaction/{hash}` | GET | Transaction by hash |
+| `/transaction/{hash}/receipt` | GET | Receipt: status, `cycles_used`/`cells_used`, events, revert reason |
+| `/mempool/transaction/{hash}` | GET | A still-pending transaction |
+
+The submission body is **binary CBOR**, not JSON: a `Submission::Transactions([...])` envelope of signed transactions (max 50 per batch). In practice you produce it with the CLI (`cowboy transaction submit`) or an SDK rather than by hand; the wallet's transaction encoding is byte-compatible with the node's deterministic CBOR.
+
+`/submit_wait` returns per-transaction results including `status`, `block_height`, gas used, and `revert_reason` when execution failed.
+
+## Accounts
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/account/{address}` | GET | Nonce and balance |
+| `/account/{address}/delegations` | GET | The account's runner stake delegations (CIP-13) |
+
+```bash
+curl http://localhost:4000/account/0x7a3B...F92E
+# {"address":"0x7a3b...","nonce":7,"balance":4999000000000}
+```
+
+## Actors
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/actor/{address}` | GET | Actor summary: code hash, balance, nonce, mailbox count, manifest |
+| `/actor/{address}/code` | GET | Deployed code |
+| `/actor/{address}/manifest` | GET | Entitlements manifest |
+| `/actors/{address}/storage` | GET | Storage entries (cursor-paginated; note the **plural** prefix) |
+| `/actors/{address}/storage/count` | GET | Storage entry count |
+| `/actors/{address}/mailbox` | GET | Pending messages (plural prefix) |
+| `/actor/{address}/logs` | GET | Event log (topic + data per event) |
+| `/actor/{address}/timers` | GET | Pending timers |
+| `/actor/{address}/upgrade-history` | GET | Code upgrade history |
+| `/actor/read` | POST | **Read-only execution** of a handler — no state mutation allowed |
+
+`/actor/read` runs a handler against current state without a transaction — the workhorse for UIs and polling:
+
+```bash
+curl -X POST http://localhost:4000/actor/read \
+  -H 'Content-Type: application/json' \
+  -d '{"actor": "0x...", "handler": "get_count", "payload_text": ""}'
+# {"result":"<base64>", "cycles_used":1234, "cells_used":0, "block_height":42, "state_root":"0x..."}
+```
+
+The payload can be given as `payload` (base64 bytes), `payload_text` (UTF-8 string), or `payload_json` (JSON value); optional `max_cycles`/`max_cells` bound the execution. A handler that attempts a state write is rejected (error 5003).
+
+## Blocks and chain state
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/height` | GET | Current chain height |
+| `/block/{hash}` | GET | Block by hash, by height, or the literal `latest` |
+| `/chain-info` | GET | `chain_id` and network name |
+| `/basefee` | GET | Current dual basefee + suggested max fees (numeric strings) |
+| `/health` | GET | Liveness (`{"status":"ok"}`) |
+| `/health/detailed` | GET | Component-level health (blockchain, mempool, storage) |
+| `/metrics` | GET | Prometheus metrics |
+
+## Tokens (CIP-20)
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/tokens` | GET | List tokens (paginated) |
+| `/token/{token_id}` | GET | Metadata: name, symbol, decimals, supply, owner |
+| `/token/{token_id}/balance/{address}` | GET | Balance (`uint128` as string) |
+| `/token/{token_id}/allowance/{owner}/{spender}` | GET | Allowance |
+
+## Runners and jobs (CIP-2)
+
+Read endpoints useful when integrating with off-chain compute:
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/runners/active` | GET | Active runners with reputation, rate card, stake |
+| `/runner/{address}` | GET | One runner's registration info |
+| `/job/{job_id}` | GET | Job spec |
+| `/job/{job_id}/status` | GET | `pending` / `assigned` / `completed` / `failed` / `cancelled` (verification is exposed via `/job/{id}/verified`) |
+| `/job/{job_id}/results` | GET | Submitted results (paginated) |
+| `/job/{job_id}/verified` | GET | The verified result |
+
+The runner daemon itself uses signed POST flows (`/runner/{address}/heartbeat`, `/runner/{address}/job_result`, …): each has a companion `*_payload` GET that returns the exact `message_to_sign_base64`, so signatures are computed over server-canonical bytes.
+
+## Proofs (CIP-15/17)
+
+`/proof/receipt/{tx_hash}`, `/proof/tx/{tx_hash}`, `/proof/account/{address}`, `/proof/actor/{address}`, `/proof/storage/{address}/{key}`, and batch `/proof/multi` (POST) return Merkle proofs against the block state root, for light-client-style verification. `/state/{actor}/{key_hex}` returns a storage value together with its proof.
+
+## Faucet (devnet only)
+
+```bash
+curl -X POST http://localhost:4000/faucet \
+  -H 'Content-Type: application/json' \
+  -d '{"address": "0x..."}'
+```
+
+The route exists only when the validator runs with the faucet enabled (`404` otherwise); with the faucet enabled on a non-dev chain (chain id other than 1 or 100) it returns `403`. Rate-limited per minute.
+
+## Other endpoint families
+
+| Family | Prefix | Spec |
+|---|---|---|
+| Storage relays / volumes (RAS) | `/ras/...` (delegation-token auth via `X-Cbfs-Delegation` header; the explorer-class aggregates — `/ras/stats`, `/ras/relays/public`, `/ras/write-relayers`, `/ras/billing/summary` — are unauthenticated, per-IP rate-limited reads) | [CIP-9](/cips/cip-9-runner-storage) |
+| Secrets | `/cbss/...` | CIP-24 (Secrets Manager) |
+| Governance | `/governance/params`, `/governance/proposals`, `/governance/proposal/{id}` | [CIP-12](/cips/cip-12-governance) |
+| Entitlements registry | `/entitlements/registry`, `/entitlements/validate-manifest` | [Entitlements](/architecture/entitlements/overview) |
+| Libraries | `/library/{publisher}/{name}` | [CIP-26](/cips/cip-26-account-libraries) |
+| State sync | `/state/snapshot`, `/state/operations` (per-IP rate-limited) | [CIP-4](/cips/cip-4-storage) |
+
+Consult `/api-docs/openapi.json` (dev mode) for the full schemas of these families.
+
+## Error codes
+
+Numeric codes accompany HTTP errors so clients can branch reliably:
+
+| Range | Domain | Notable codes |
+|---|---|---|
+| 1000–1004 | General | 1000 internal, 1002 not found, 1003 timeout |
+| 2000–2017 | Transactions | 2001 invalid signature, 2003/2004 nonce too low/high, 2005 out of gas, 2009 deferred tx rejected, 2011 basefee too low, 2016 admission busy (429), 2017 admission retry (500) |
+| 3000–3001 | Accounts | 3000 not found, 3001 invalid address |
+| 4000–4001 | Blocks | |
+| 5000–5004 | Actors | 5002 handler not found, 5003 read-only violation, 5004 read limits exceeded |
+| 6000–6002 | Storage / serialization | |
+| 7000–7005 | Runners/jobs | 7000 runner not found, 7002 job not found |
+| 8000 | Faucet disabled | |
+| 9000 | Library not found (CIP-26) | |
+
+Execution-level failures inside a committed transaction surface as **E-codes** in the receipt instead — see the [error reference](/errors/overview).
+
+## Further reading
+
+- [Troubleshooting](/getting-started/troubleshooting) — symptom-first debugging
+- [Configuration Reference](/references/configuration) — ports, rate limits, faucet gating
+- [CLI Specifications](/cli-specs/summary) — the command-line wrappers over this API

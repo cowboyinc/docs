@@ -1,0 +1,10 @@
+{
+  "entitlements": [
+    {
+      "id": "storage.kv"
+    },
+    {
+      "id": "timer.schedule"
+    }
+  ]
+}

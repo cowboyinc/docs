@@ -1,0 +1,30 @@
+{
+  "source": "https://raw.githubusercontent.com/steel-dev/steel-python/main/api.md",
+  "server": "https://api.steel.dev",
+  "auth": {
+    "scheme": "steel-api-key",
+    "type": "apiKey",
+    "in": "header",
+    "name": "Steel-Api-Key",
+    "sdk_header": "steel-api-key",
+    "secret": "STEEL_API_KEY"
+  },
+  "routes": {
+    "screenshot": {"method": "POST", "path": "/v1/screenshot", "response_fits_cap": true},
+    "pdf": {"method": "POST", "path": "/v1/pdf", "response_fits_cap": true}
+  },
+  "excluded_routes": {
+    "/v1/scrape": "response embeds full inline page content (html/markdown/readability/cleaned_html) — unbounded, exceeds the ~40-64KB runner-result transport cap and parks the continuation silently",
+    "/v1/sessions": "session lifecycle response carries a live CDP websocketUrl/debugUrl; get_result delivers results out of PUBLIC consensus storage, so the connection credential would be public for the retention window (E2B-class live-credential-in-public-state)",
+    "/v1/sessions/{id}": "same session-credential exposure via public get_result",
+    "/v1/sessions/{id}/release": "session lifecycle not exposed",
+    "/v1/sessions/{id}/files.zip": "binary archive, large",
+    "/v1/credentials": "manages stored vendor credentials — out of scope for a key-brokering wrapper"
+  },
+  "bounds": {
+    "max_url_chars": 2048,
+    "runner_result_bytes": 65536,
+    "runner_data_target_bytes": 60000,
+    "result_bytes": 38000
+  }
+}

@@ -1,0 +1,44 @@
+---
+title: "E1005 — Out of cycles"
+description: "Out of cycles"
+---
+
+# E1005 — Out of cycles
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1005` |
+| **Slug** | `E1005` |
+| **Category** | `gas` (Gas) |
+| **CIP** | CIP-3 |
+
+## What happened
+
+Out of cycles.
+
+## Why it happened
+
+The transaction consumed more compute cycles than the `cycles_limit` allows.
+
+## How to fix
+
+Increase `cycles_limit`, simplify the transaction logic, or split across multiple transactions.
+
+## Receipt example
+
+```json
+{
+  "code": 1005,
+  "slug": "E1005",
+  "category": "gas",
+  "what": "Out of cycles",
+  "fix": "Increase `cycles_limit`, simplify the transaction logic, or split across multiple transactions.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1005"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

@@ -1,0 +1,56 @@
+---
+title: "Idempotency"
+description: "Transaction idempotency guarantees"
+---
+
+## Introduction
+
+This page describes how Cowboy ensures that a submitted transaction is applied at most once, and how protocol-driven message execution avoids duplicate state transitions. The description follows the Cowboy whitepaper and CIPs.
+
+<Tip>
+  Idempotency on Cowboy is achieved via per-account nonces and a single canonical block order; protocol-delivered messages (timers, deferred callbacks) are serialized by consensus.
+</Tip>
+
+## Definition and Scope
+
+- Idempotency refers to the guarantee that a transaction, once accepted and executed, cannot be executed again to produce additional state transitions.
+- The scope includes: user-submitted transactions, protocol-delivered timer messages (CIP‑1), and deferred callbacks produced by the off-chain compute framework (CIP‑2).
+
+## Mechanisms
+
+### Account Nonce and Transaction Validation (Whitepaper)
+
+- The global state tracks per-address account data, including `nonce` (whitepaper: state contains `balance` and `nonce`).
+- During block processing, the state transition function validates each transaction’s signature, nonce, and balance before execution (whitepaper: “Validate signature, nonce, and balance.”).
+- Consequences for idempotency:
+  - A replay of the same signed transaction is rejected once the sender’s nonce has advanced.
+  - Out-of-order transactions are not executed until the correct nonce is present.
+
+### Deterministic Ordering and Single Inclusion (Whitepaper)
+
+- Cowboy employs a Simplex-based BFT protocol to produce a single canonical ordering of blocks. Within this ordering, nonce checks ensure that a user transaction can be accepted and executed at most once.
+
+### Timers and the Actor Scheduler (CIP‑1)
+
+- The Autonomous Actor Scheduler delivers due timer messages from a tiered calendar queue into each block’s dedicated processing budget. If the budget is exhausted or bids are insufficient, due timers are carried over to the next block (“Best‑Effort Delivery”).
+- This protocol-driven delivery model prevents duplicate execution at the protocol level: a due timer message, when executed, consumes resources within the block’s timer budget; timers not executed in a block are deferred rather than duplicated.
+
+### Deferred Transactions for Off‑chain Callbacks (CIP‑2)
+
+- After collecting the required number of results for an off‑chain task, the Runner Submission Contract constructs and signs a deferred transaction containing the developer-specified callback. Validators include and execute this deferred transaction in a future block.
+- Within the callback, the Actor MUST call `consume_result` on the Dispatcher, identifying which Runner’s result was used. This finalizes the task and triggers payment distribution. Finalization via `consume_result` prevents multiple payouts for the same task result.
+
+## Practical Notes
+
+- User-submitted transactions rely on signature and nonce validation for replay protection and single execution.
+- Protocol-delivered messages (timers and deferred callbacks) are scheduled, included, and executed by consensus rules. When not executed, they are carried forward by protocol logic rather than duplicated within the same block.
+
+## Further Reading
+
+- [Transaction Fields](/architecture/tx/tx-fields)
+- [Scheduler Overview](/architecture/scheduler/overview)
+- [Off-Chain Lifecycle](/architecture/offchain/lifecycle)
+- [CIP-1](/cips/cip-1-actor-scheduler)
+- [CIP-2](/cips/cip-2-offchain-compute)
+
+

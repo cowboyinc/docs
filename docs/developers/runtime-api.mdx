@@ -1,0 +1,139 @@
+---
+title: "Runtime API Reference"
+description: "The cowboy_sdk.runtime surface: context, state, events, timers, messaging, tokens, subscriptions"
+icon: book
+---
+
+## Overview
+
+`cowboy_sdk.runtime` is the supported, developer-facing wrapper over the low-level `pvm_host` bindings. Actors should call `runtime.*` (and the higher-level `self.storage`, `call()`, `send()` helpers) rather than `pvm_host` directly. All listed signatures are from the shipping SDK.
+
+```python
+from cowboy_sdk import runtime
+
+height = runtime.get_block_height()
+runtime.emit_event("my.event", {"height": height})
+```
+
+## Execution context
+
+| Function | Returns |
+|---|---|
+| `context()` | Full context dict: `block_height`, `block_hash`, `tx_hash`, `sender`, `actor_addr`, `timestamp_ms`, `nonce`, `msg_id` |
+| `get_sender()` | Transaction sender (20-byte address) |
+| `get_actor_address()` | This actor's own address (20 bytes) |
+| `get_tx_hash()` | Current transaction hash (32 bytes) |
+| `get_block_height()` | Current block height (`int`) |
+| `get_timestamp_ms()` | Block timestamp in milliseconds |
+| `get_chain_id()` | Chain ID (falls back to `0` where the host context doesn't supply one — the production context currently doesn't) |
+| `get_pvm_version()` | PVM version string (falls back to `"unknown"` under the production host) |
+
+Mode helpers: `mode()` returns `"fsm"` (production), `"checkpoint"` (debug-only), or `"local"`; `is_production()` / `is_development()` / `is_checkpoint_mode()` are the boolean forms; `require_fsm()` raises unless running in FSM mode.
+
+## State
+
+Prefer `self.storage[...]` (the `@actor` proxy, with automatic CBOR encoding). The raw layer underneath:
+
+| Function | Semantics |
+|---|---|
+| `get_state(key: bytes) -> bytes \| None` | Read raw bytes |
+| `set_state(key: bytes, value: bytes)` | Write raw bytes; refuses the reserved keys `__OWNER__` / `__INITIALIZED__` |
+| `delete_state(key: bytes)` | Delete; same reserved-key guard |
+| `scan_state_prefix(prefix: bytes, limit: int = 100) -> list[tuple[bytes, bytes]]` | Up to `limit` key/value pairs from `prefix`, ascending; only verbatim (≤ 32-byte) keys are visible. Paginate by appending `b"\x00"` to the last key |
+
+<Warning>
+  **Integers are capped at `2^64 - 1`.** The canonical CBOR encoder emits no bignum
+  tags, so anything at or above `2^64` fails to encode. Which exception you see
+  depends on the path: `self.storage[...]` calls `codec.encode` directly and raises
+  `OverflowError`, while `emit_event` payloads and handler returns go through
+  `payload_codec._encode_value`, which reclassifies it to `CodecError`. The encoder
+  *decodes* bignum tags 2 and 3, so a value can be read back that could never have
+  been written — the asymmetry only surfaces on the write.
+
+  This bites when a native integer holds a protocol quantity that is wider: CIP-20
+  token amounts are `u128`. An uncaught failure is safe — the transaction overlay
+  discards the frame, so token and storage effects from earlier in the handler roll
+  back with it — but it costs the gas already spent and surfaces as an opaque
+  encode error rather than something the caller can act on. Range-check such values
+  up front and return an explicit error instead.
+
+  Note the contrast with an ordinary `return {"error": ...}`, which is a normal
+  return and therefore **commits** everything the handler did before it. Validate
+  before you mutate on those paths, or an early-out leaves half the work applied.
+</Warning>
+
+## Events and gas
+
+| Function | Semantics |
+|---|---|
+| `emit_event(name: str, payload: bytes \| str \| dict, *, schema: bytes \| None = None) -> dict` | Emit an event and return its `EmitResult` (`emit_id`, `sync_outcomes`, `deferred_subs`). Optional `schema` is a 32-byte identifier that must agree with explicitly typed subscribers; the node does not validate the payload against it. `bytes` is the raw hatch — sent verbatim. Anything else is canonical CBOR, so pass the object itself; a `str` holding a serialized JSON object or array raises `CodecError` rather than nest JSON text inside CBOR. To send pre-serialized JSON deliberately, pass bytes: `json.dumps(obj).encode()` |
+
+Gas is metered for you. The runtime and host account for the Cycles a handler consumes and the Cells its data occupies, and enforce both budgets; actor code does not participate in that accounting. Write handlers as if gas accounting does not exist, and use `estimate_gas` against a node when you need real cost figures.
+
+<Warning>
+  Do not call `runtime.charge_gas()` in application actors. It is still present and still deducts Cycles from your budget, so a manual call is not a harmless annotation — it burns gas **on top of** the automatic metering, inflating the cost of every invocation and risking a spurious `OutOfGas`. Manual calls were removed from the bundled examples in node#921, and from the remaining actors, examples, and guides in cowboy#284 and node#1174 — diff those for what the removal looks like in practice.
+</Warning>
+
+## Ownership and lifecycle
+
+| Function | Semantics |
+|---|---|
+| `get_owner() -> bytes` | Owner address, or `b""` if unset |
+| `assume_ownership_if_unowned() -> bytes` | Bootstrap helper: if unowned, the current sender becomes owner (idempotent). Call it from `init` only — `init` runs atomically with deploy, which is what closes the front-running window |
+| `transfer_ownership(new_owner: bytes)` | First setter wins while unowned; afterwards only the owner may transfer. Zero address rejected |
+| `renounce_ownership()` | Permanently sets the owner to the zero address; `@callable_by(OWNER)` handlers become unreachable |
+| `is_initialized() -> bool` | True once `init` has completed successfully |
+
+## Messaging and jobs
+
+| Function | Semantics |
+|---|---|
+| `call_actor(target: bytes, method: str, payload: bytes, cycles_limit: int) -> bytes` | Synchronous cross-actor call (prefer the `cowboy_sdk.call()` wrapper, which handles the payload codec and errors) |
+| `send_message(target: bytes, payload: bytes)` | Fire-and-forget async message — allowed in `@deferred` handlers only |
+| `submit_job(payload: bytes)` | Submit a pre-encoded Runner job — `@deferred` handlers only. Prefer the high-level `runner.llm/http/mcp` continuations ([CIP-2](/cips/cip-2-offchain-compute)) |
+
+## Timers ([CIP-5](/cips/cip-5-timers))
+
+| Function | Semantics |
+|---|---|
+| `schedule_timer(height: int, payload: bytes) -> bytes` | Fire `payload` back at this actor at `height`; protocol defaults for fees/TTL; returns a `timer_id` |
+| `schedule_timer_ex(height, payload, fee_payer=None, gas_limit=None, expires_at=None) -> bytes` | Extended form: choose the fee payer — which must be the executing actor or the current transaction sender; any other address is rejected (CIP-5 §4.2) — plus a per-fire gas limit and an absolute expiry (≤ current height + max TTL) |
+| `extend_timer(timer_id: bytes, new_expires_at: int)` | Renew a timer you own; a missing timer is a silent no-op |
+| `cancel_timer(timer_id: bytes)` | Cancel by id |
+
+## Event subscriptions ([CIP-29](/cips/cip-29-on-chain-event-hooks))
+
+| Function | Semantics |
+|---|---|
+| `subscribe_event(emitter: bytes, topic: bytes, handler: str, gas_prepaid: int, bid: int = 0, *, schema: bytes \| None = None) -> bytes` | Subscribe to `(emitter, topic)`; registration fee and bid are burned, `gas_prepaid` is held and refundable; returns a 33-byte `sub_id`. Optional `schema` is a 32-byte identifier; a mismatch with the emitter's declaration raises `event_schema_mismatch` (117) before fees or writes. |
+| `unsubscribe_event(sub_id: bytes) -> int` | Subscriber-only; refunds remaining prepaid gas |
+| `force_unsubscribe_event(sub_id: bytes)` | Emitter-only; remaining gas refunds to the subscriber |
+| `update_bid(sub_id: bytes, additional_bid: int) -> int` | Raise the subscription's priority bid (burned) |
+| `topup_subscription(sub_id: bytes, additional_gas: int) -> int` | Add prepaid gas; any caller may pay |
+
+## Randomness and crypto
+
+| Function | Semantics |
+|---|---|
+| `randomness(domain: bytes) -> bytes` | Deterministic protocol randomness, domain-separated |
+| `keccak256(data: bytes) -> bytes` | Keccak-256 digest |
+
+## Code upgrade
+
+| Function | Semantics |
+|---|---|
+| `upgrade_self(new_code: bytes, new_manifest: bytes \| None = None)` | Replace this actor's code (requires the `sys.upgrade` entitlement). A new manifest must be a subset of the current one — entitlements can narrow, never broaden. State, balance, and mailbox are preserved; new code takes effect on the next invocation |
+
+## Tokens ([CIP-20](/cips/cip-20-fungible-tokens))
+
+The token surface (`token_create`, `token_balance_of`, `token_total_supply`, `token_transfer`, `token_approve`, `token_allowance`, `token_transfer_from`, `token_mint`, `token_burn`) is covered with examples in the CIP-20 spec; amounts are `int` base units (`u128`), addresses 20 bytes, `token_id` 32 bytes.
+
+## Behavior under the mock host
+
+Unit tests run against `cowboy_sdk.mock_host` (usually via `cowboy_sdk.testing.SimulatedChain`). Context, state, ownership, timers, subscriptions, and `call_actor` (with `set_call_handler`) all work in-memory. `emit_event` works under `SimulatedChain` (which captures events for `chain.events()`) but not under the bare mock host; the mock implements no gas meter, so gas is not simulated in unit tests — use `estimate_gas` against a real node when you need cost figures. `keccak256` falls back to SHA-256, and `randomness` and the `token_*` operations require a real chain.
+
+## Further reading
+
+- [CIP-6 §12 — Runtime Module](/cips/cip-6-sdk) — normative spec for the core of this surface (mode helpers, CIP-29 subscriptions, and some context getters are shipping-SDK additions beyond §12)
+- [SDK Overview](/developers/sdk) — the high-level `@actor` / continuation / model layer
+- [PVM Reference](/architecture/actor-vm/pvm-reference) — validation rules and determinism guards

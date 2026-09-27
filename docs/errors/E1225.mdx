@@ -1,0 +1,44 @@
+---
+title: "E1225 — Duplicate message id"
+description: "Duplicate message id"
+---
+
+# E1225 — Duplicate message id
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1225` |
+| **Slug** | `E1225` |
+| **Category** | `runtime` (Runtime) |
+
+
+## What happened
+
+Duplicate message id.
+
+## Why it happened
+
+A message with this id was already delivered.
+
+## How to fix
+
+Use a fresh message id.
+
+## Receipt example
+
+```json
+{
+  "code": 1225,
+  "slug": "E1225",
+  "category": "runtime",
+  "what": "Duplicate message id",
+  "fix": "Use a fresh message id.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1225"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

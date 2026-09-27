@@ -1,0 +1,44 @@
+---
+title: "E1610 — Non-deterministic results"
+description: "Non-deterministic results"
+---
+
+# E1610 — Non-deterministic results
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1610` |
+| **Slug** | `E1610` |
+| **Category** | `runner` (Runner / Consensus) |
+| **CIP** | CIP-2 §9 |
+
+## What happened
+
+Non-deterministic results.
+
+## Why it happened
+
+Runners produced different outputs under deterministic verification mode.
+
+## How to fix
+
+Use a deterministic executor or TEE to ensure consistent results.
+
+## Receipt example
+
+```json
+{
+  "code": 1610,
+  "slug": "E1610",
+  "category": "runner",
+  "what": "Non-deterministic results",
+  "fix": "Use a deterministic executor or TEE to ensure consistent results.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1610"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

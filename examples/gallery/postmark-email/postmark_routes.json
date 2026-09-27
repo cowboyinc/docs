@@ -1,0 +1,43 @@
+{
+  "source": "https://postmarkapp.com/developer/api/email-api",
+  "doc_source": "https://postmarkapp.com/developer/api/overview",
+  "endpoint": "https://api.postmarkapp.com/email",
+  "method": "POST",
+  "operation": "email/send-single",
+  "auth": {"in": "header", "name": "X-Postmark-Server-Token", "secret": "POSTMARK_SERVER_TOKEN", "scheme": "token"},
+  "idempotency": {"header": "Idempotency-Key", "max_length": 256, "vendor_native": false},
+  "required_request": ["From", "To"],
+  "one_of_body": ["HtmlBody", "TextBody"],
+  "optional_request": ["Subject", "HtmlBody", "TextBody", "Cc", "Bcc", "ReplyTo", "MessageStream"],
+  "recipient_fields": ["To", "Cc", "Bcc", "ReplyTo"],
+  "recipient_format": "comma-separated string",
+  "total_recipients_max": 50,
+  "wrapper_inputs": [
+    "hire_id",
+    "From",
+    "To",
+    "Subject",
+    "HtmlBody",
+    "TextBody",
+    "Cc",
+    "Bcc",
+    "ReplyTo",
+    "MessageStream"
+  ],
+  "success_response": ["To", "SubmittedAt", "MessageID", "ErrorCode", "Message"],
+  "success_error_code": 0,
+  "error_signal": {"error_code_field": "ErrorCode", "message_field": "Message", "http_status": [200, 422, 401], "nonzero_is_error": true},
+  "bounds": {
+    "max_address_chars": 320,
+    "max_recipients": 50,
+    "max_total_recipients": 50,
+    "max_subject_chars": 2000,
+    "max_body_chars": 24000,
+    "max_stream_chars": 64,
+    "max_id_chars": 200,
+    "max_error_chars": 500,
+    "max_request_bytes": 32000,
+    "runner_result_bytes": 65536,
+    "result_bytes": 38000
+  }
+}

@@ -1,0 +1,286 @@
+---
+title: Fee Model Overview
+description: Understanding Cowboy's dual-metered gas system (Cycles + Cells)
+---
+
+## Introduction
+
+Cowboy introduces a **dual-metered gas model** that independently measures and prices two fundamental resources:
+
+<CardGroup cols={2}>
+  <Card title="Cycles" icon="microchip">
+    **Computation**  
+    Every CPU operation: bytecode instructions, function calls, cryptography
+  </Card>
+  <Card title="Cells" icon="database">
+    **Data & Storage**  
+    Every byte: transaction payloads, state writes, return data
+  </Card>
+</CardGroup>
+
+<Tip>
+  **Key Insight**: A single gas metric cannot fairly price both computation and storage. Cowboy separates them with independent markets and basefees.
+</Tip>
+
+> Note: Examples and code snippets in this page are conceptual and illustrative. Normative rules (metering and formulas) follow CIP-3. Final interfaces and naming should follow the SDK and Developer Guide.
+
+## The Problem with Single Gas
+
+### Unfair Subsidization
+
+In single-gas systems, compute-heavy and storage-heavy operations can consume similar gas despite impacting different resources, leading to cross-subsidies.
+
+### Unpredictable Costs
+
+Cost predictability improves when each resource has its own price signal: compute reflects cycle demand; storage reflects byte demand.
+
+## Cowboy's Solution: Dual Metering
+
+### Independent Dimensions
+
+```
+Total Fee = (Cycles Used × Cycle Price) + (Cells Used × Cell Price)
+```
+
+Each resource has:
+- ✅ Independent usage tracking
+- ✅ Independent price (basefee)
+- ✅ Independent fee market
+- ✅ Independent limits
+
+### Visual Comparison
+
+Dual metering decouples pricing: compute and data are tracked and priced independently, reducing cross‑subsidies.
+
+## Cycles: Computation Metering
+
+### What Cycles Measure
+
+**Every computational step** executed by the VM:
+
+<Tabs>
+  <Tab title="Bytecode Instructions">
+    Every Python bytecode operation has a fixed cycle cost:
+    
+    Partial cost examples per CIP‑3 include arithmetic (1), function call (10), dictionary access (3), list operations (2). Dynamic surcharges apply for type/size.
+  </Tab>
+  
+  <Tab title="Dynamic Surcharges">
+    Operations have base cost + dynamic surcharge based on data size:
+    
+    Costs incorporate base + size/type‑dependent surcharges (see CIP‑3 tables).
+  </Tab>
+  
+  <Tab title="Host Functions">
+    Protocol APIs have fixed cycle costs:
+    
+    Representative costs include storage read (10), write (50), message send (80), timer set (200), ECDSA verify (3,000), BLS verify (8,000).
+  </Tab>
+  
+  <Tab title="Built-in Functions">
+    Python built-ins have size-dependent costs:
+    
+    Selected built‑ins (CIP‑3): len (5), sum (10+(n−1)), sorted (20 + n×log₂ n), max/min (10+(n−1)).
+  </Tab>
+</Tabs>
+
+### Cycle Metering Implementation
+
+Instruction‑level tracking: lookup base cost, add surcharge, check limit, deduct remaining.
+
+### Cycle Limits
+
+Limits are protocol‑defined and enforced; block targets aim for ~50% utilization with independent adjustment per resource (see Dual EIP‑1559).
+
+On limit exceed, execution halts with a deterministic error (e.g., OutOfCyclesError/OutOfCellsError).
+
+## Cells: Data Metering
+
+### What Cells Measure
+
+**Every byte** of data that impacts the network:
+
+- Transaction payloads
+- Storage writes
+- Return data
+- Scratch space (/tmp)
+- Blob commitments
+
+**1 Cell = 1 Byte**
+
+### Cell Metering Points
+
+<Steps>
+  <Step title="Intrinsic Calldata">
+    Transaction payload is charged **before execution**:
+    
+    ```python
+    # Conceptual example (non-normative)
+    tx = Transaction(
+        actor="0x...",
+        handler="process",
+        data=bytes(1000)  # 1000 Cells charged immediately
+    )
+    ```
+  </Step>
+  
+  <Step title="Storage Operations">
+    Key-value storage charges for data size:
+    
+    ```python
+    # Conceptual examples (non-normative)
+    # Storage write
+    storage_set("mykey", "myvalue")
+    # Cells charged: len("mykey") + len("myvalue") = 5 + 7 = 12
+    
+    # Large value
+    storage_set("data", bytes(100_000))
+    # Cells charged: 4 + 100,000 = 100,004
+    ```
+  </Step>
+  
+  <Step title="Memory Allocation">
+    Creating objects charges for their size:
+    
+    ```python
+    # String: 24 bytes (header) + length
+    s = "hello"  # 24 + 5 = 29 Cells
+    
+    # List: 40 bytes + 8 per capacity
+    L = [1,2,3]  # 40 + 8*3 = 64 Cells
+    
+    # Dict: 64 + 16 per bucket
+    d = {}  # 64 + 16*8 = 192 Cells (initial 8 buckets)
+    ```
+  </Step>
+  
+  <Step title="Return Data">
+    Result size charged **after execution**:
+    
+    ```python
+    def get_data(self):
+        return bytes(50_000)  # 50,000 Cells charged on return
+    ```
+  </Step>
+  
+  <Step title="Scratch Space">
+    Temporary file writes are metered:
+    
+    ```python
+    # /tmp file write (if allowed)
+    with open("/tmp/file.txt", "w") as f:
+        f.write("data" * 1000)  # 4000 Cells charged
+    ```
+  </Step>
+</Steps>
+
+### Cell Metering Implementation
+
+Cells are charged at explicit I/O boundaries: intrinsic calldata, storage writes, blob commits, scratch writes, return data.
+
+### Cell Limits
+
+Per‑transaction Cells limits and per‑call memory limits are enforced by the VM per CIP‑3.
+
+**What happens on limit:**
+```python
+# ❌ Exceeds cell limit
+def memory_bomb():
+    data = bytes(100_000_000)  # 100 MB
+    # Raises: OutOfCellsError
+
+# ❌ Exceeds memory limit
+def allocate_huge():
+    L = [0] * 100_000_000  # Too much RAM
+    # Raises: MemoryError
+```
+
+## Independent Fee Markets
+
+### Dual Basefee Adjustment
+
+Each resource has its own **EIP-1559 style basefee**:
+
+```python
+# Cycle basefee adjustment
+basefee_cycle_new = basefee_cycle_old × (1 + (U_c - T_c) / T_c / α)
+
+# Cell basefee adjustment
+basefee_cell_new = basefee_cell_old × (1 + (U_b - T_b) / T_b / α)
+```
+
+**Parameters:**
+- `U`: Actual usage in parent block
+- `T`: Target usage (typically 50% of limit)
+- `α`: Adjustment speed (e.g., 8 for ~12.5% max change)
+
+### Example: Independent Markets
+
+Compute and data basefees adjust independently per resource usage, creating two negative feedback loops that stabilize around targets.
+
+### Fee Calculation
+
+Per transaction, the basefee portions for Cycles/Cells are fully burned; tips are paid to the producer. Effective tip per resource is min(tip_per_*, max_fee_per_* − basefee_*).
+
+## Benefits of Dual Metering
+
+### 1. Fair Pricing
+
+```python
+# App A: Heavy computation
+def verify_proof(proof):
+    result = expensive_crypto(proof)  # 100,000 Cycles
+    storage.set("verified", True)      # 15 Cells
+    
+# Cost: Mostly cycles ✅
+
+# App B: Heavy storage
+def store_data(data):
+    storage.set("data", data)  # 1,000,000 Cells
+    return "stored"            # 500 Cycles
+
+# Cost: Mostly cells ✅
+```
+
+Each app pays for what it uses, not subsidized by others.
+
+### 2. Predictable Costs
+
+Estimate Cycles/Cells separately; apply the corresponding basefee and chosen tips.
+
+### 3. DoS Protection
+
+Separate limits provide defense in depth against compute‑only or storage‑only abuse.
+
+### 4. Independent Optimization
+
+Markets optimize separately:
+
+- **High compute demand** → Higher cycle basefee → Encourages efficient algorithms
+- **High storage demand** → Higher cell basefee → Encourages data compression
+
+## Complete Example
+
+Examples should be derived from actual application logic; pricing follows the dual basefee model and CIP‑3 metering.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Dual EIP-1559" icon="chart-line" href="/architecture/fees/dual-eip1559">
+    Deep dive into the basefee adjustment mechanism
+  </Card>
+  <Card title="Metering Points" icon="location-dot" href="/architecture/fees/metering-points">
+    Complete reference of where costs are charged
+  </Card>
+  <Card title="Worked Example" icon="calculator" href="/architecture/fees/worked-example">
+    Step-by-step transaction cost calculation
+  </Card>
+  <Card title="CIP-3 Specification" icon="file-lines" href="#">
+    Formal specification with complete cost tables
+  </Card>
+</CardGroup>
+
+## Further Reading
+
+- [Actor VM Overview](/architecture/actor-vm/overview)
+- [Best Practices: Gas Optimization](/developers/best-practices)

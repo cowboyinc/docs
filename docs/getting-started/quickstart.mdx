@@ -1,0 +1,191 @@
+---
+title: Quickstart
+description: Configure the Cowboy CLI and deploy your first actor
+icon: layer-plus
+---
+
+## Overview
+
+This guide walks through the fastest path from a working `cowboy` CLI to a deployed Python actor on the hosted Cowboy devnet. You will create a normal project directory, initialize a devnet wallet, scaffold a starter actor, deploy it, call it, and inspect the result.
+
+**What you'll learn:**
+- How to scaffold a project and manage a wallet
+- How to deploy and execute a Python actor
+- Where to go next when you want to customize actor behavior
+
+## Prerequisites
+
+- The `cowboy` CLI is installed and available on your `PATH`
+- Optional: `lasso` is installed if you prefer the interactive console
+
+Verify the CLI:
+
+```bash
+cowboy version
+```
+
+If you use Lasso, verify it separately:
+
+```bash
+lasso --version
+```
+
+## 1. Create a Project Directory
+
+Start from any directory where you keep projects:
+
+```bash
+mkdir my-cowboy-app
+cd my-cowboy-app
+```
+
+## 2. Initialize Devnet Config
+
+```bash
+cowboy init dev
+```
+
+This creates `.cowboy/` with a fresh secp256k1 keypair and a config pointing at the hosted Mesa devnet. The devnet faucet funds the generated wallet when available.
+
+```
+my-cowboy-app/
+├── .cowboy/
+│   ├── keys/dev       # PEM-encoded secp256k1 private key
+│   └── config.json    # active network, RPC URL
+└── ...
+```
+
+Verify the network and wallet:
+
+```bash
+cowboy status
+cowboy wallet address
+cowboy wallet balance
+```
+
+## 3. Scaffold the Hello Actor
+
+```bash
+cowboy actor new hello
+```
+
+This creates `actors/hello/main.py`, a tiny SDK counter actor. The generated file includes durable actor storage, an `init` handler, public handlers, and module-level dispatch functions:
+
+```python
+# actors/hello/main.py
+from cowboy_sdk import actor, public
+
+
+@actor
+class CounterActor:
+    def init(self, payload=None):
+        self.storage["__name__"] = "Counter"
+        self.storage["counter"] = 0
+
+    @public(decode="raw")
+    def increment(self, payload=None):
+        count = (self.storage.get("counter") or 0) + 1
+        self.storage["counter"] = count
+        return str(count).encode()
+
+    @public(decode="raw")
+    def get_count(self, payload=None):
+        count = self.storage.get("counter") or 0
+        return str(count).encode()
+```
+
+<Note>
+  The generated file also includes the wrapper functions the PVM calls by handler name. Keep those wrappers in place when you edit the actor.
+</Note>
+
+## 4. Deploy the Hello Actor
+
+Deploy it:
+
+```bash
+cowboy actor deploy --code actors/hello/main.py --salt 0x01
+```
+
+The CLI prints a transaction hash and a deterministic CREATE2-style actor address:
+
+```text
+Deploying actor...
+  Code file: actors/hello/main.py
+  Salt: 0x01
+  Nonce: 0
+  Atomic init: init (payload: 2 bytes)
+  Transaction hash: 0xabc123...
+  Actor address: 0xdef456...
+
+✓ Actor deployment transaction submitted successfully
+  Actor address: 0xdef456...
+  Waiting for block confirmation...
+✓ Actor deployed successfully!
+  Code hash: 0x789abc...
+  Balance: 0
+  Nonce: 0
+```
+
+Use the printed `Actor address` in the commands below. Compute that address ahead of time if you want:
+
+```bash
+cowboy wallet address
+cowboy actor address --code actors/hello/main.py --creator <YOUR_ADDR> --salt 0x01
+```
+
+## 5. Call the Actor
+
+Execute a handler:
+
+```bash
+cowboy actor execute --actor <ACTOR_ADDR> --handler increment --payload 0x
+cowboy actor execute --actor <ACTOR_ADDR> --handler get_count --payload 0x
+```
+
+Inspect state and logs:
+
+```bash
+cowboy actor get --address <ACTOR_ADDR>
+cowboy actor logs --address <ACTOR_ADDR>
+```
+
+## 6. Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Minimal Actor Walkthrough" icon="code" href="/architecture/actor-vm/minimal-actor">
+    Understand the actor programming model
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/cli-specs/summary">
+    Every `cowboy` subcommand, flags, and semantics
+  </Card>
+  <Card title="End-to-End Example" icon="messages" href="/developers/examples">
+    Study source-checkout examples when you want larger actor patterns
+  </Card>
+  <Card title="Fee Model" icon="gauge" href="/architecture/fees/overview">
+    Learn how Cycles and Cells are metered and priced
+  </Card>
+</CardGroup>
+
+## Where to Find Things
+
+- **Your project config**: `.cowboy/config.json`
+- **Your devnet key**: `.cowboy/keys/dev`
+- **Your starter actor**: `actors/hello/main.py`
+- **CLI reference**: [CLI Developer Experience](/cli-specs/summary)
+- **SDK tutorial**: [Your First Actor](/developers/your-first-actor)
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="'cowboy: command not found'" icon="circle-question">
+    Install the `cowboy` CLI using the distribution method provided by the Cowboy team, then open a new terminal and run `cowboy version`.
+  </Accordion>
+
+  <Accordion title="'connection refused' on RPC" icon="plug">
+    Run `cowboy status` to see which RPC URL the CLI is using. If you intended to use the hosted devnet, re-run `cowboy init dev` or pass `--rpc-url` explicitly. If you are intentionally using a local validator, make sure that validator is running before using `cowboy init local`.
+  </Accordion>
+
+  <Accordion title="Actor deploy fails with 'insufficient gas'" icon="gauge">
+    The default cycle/cell limits are conservative. For larger actors, pass `--cycles-limit` and `--cells-limit` — see [cowboy actor](/cli-specs/cowboy-actor).
+  </Accordion>
+</AccordionGroup>

@@ -1,0 +1,44 @@
+---
+title: "E1403 — Insufficient token balance"
+description: "Insufficient token balance"
+---
+
+# E1403 — Insufficient token balance
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1403` |
+| **Slug** | `E1403` |
+| **Category** | `token` (Token (CIP-20)) |
+| **CIP** | CIP-20 |
+
+## What happened
+
+Insufficient token balance.
+
+## Why it happened
+
+The sender's token balance is less than the transfer amount.
+
+## How to fix
+
+Increase the sender's token balance (mint or receive tokens) before transferring.
+
+## Receipt example
+
+```json
+{
+  "code": 1403,
+  "slug": "E1403",
+  "category": "token",
+  "what": "Insufficient token balance",
+  "fix": "Increase the sender's token balance (mint or receive tokens) before transferring.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1403"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

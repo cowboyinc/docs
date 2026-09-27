@@ -1,0 +1,60 @@
+---
+title: "cowboy entitlement"
+description: Grant scoped permissions between accounts and actors
+icon: key
+---
+
+## Synopsis
+
+```bash
+cowboy entitlement grant --grantee <address> --scope-actor <address> --action <name>
+                         [--max-total-amount <cby>]
+                         [--max-amount-per-use <cby>]
+                         [flags]
+```
+
+## Subcommands
+
+### `cowboy entitlement grant`
+
+Grant an entitlement — a bounded, revocable permission for one address to use resources controlled by another.
+
+**Behavior:**
+
+1. Load the private key using [key auto-discovery](/cli-specs/key-auto-discovery).
+2. Build an `EntitlementGrant` transaction with the supplied scope and limits.
+3. Submit it and print the transaction hash.
+
+The granter is the transaction sender. After the grant is finalised, the grantee can perform `--action` against the `--scope-actor` within the declared limits until the entitlement is explicitly revoked or exhausted.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--grantee` | Required | Address that receives the permission |
+| `--scope-actor` | Required | Actor whose resources are entitled |
+| `--action` | Required | Action name. Currently supported: `use-owner-balance` |
+| `--max-total-amount` | Unbounded | Total budget for this entitlement, in CBY |
+| `--max-amount-per-use` | Unbounded | Per-use cap, in CBY |
+| `--private-key` | Auto-discovered | Granter's private key |
+| `--rpc-url` | Auto-discovered | RPC endpoint |
+
+**Example:**
+
+```bash
+$ cowboy entitlement grant \
+    --grantee 0x7a3B...F92E \
+    --scope-actor 0xdef456... \
+    --action use-owner-balance \
+    --max-total-amount 100 \
+    --max-amount-per-use 10
+Transaction: 0xabc123...
+  Entitlement granted: 0x7a3B...F92E may spend up to 100 CBY (10 CBY/use)
+  from 0xdef456... via 'use-owner-balance'.
+```
+
+## Edge Cases
+
+- Only the `use-owner-balance` action is currently defined. Other action names are rejected at submission time.
+- Grants are revocable with a future `cowboy entitlement revoke` (tracked separately).
+- Limits are tracked on-chain as part of actor state; once exhausted, subsequent uses revert.

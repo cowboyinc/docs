@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hyperliquid trader</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<main class="page">
+  <div class="shell">
+
+    <header class="masthead">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"></circle>
+            <circle cx="12" cy="12" r="3.5"></circle>
+            <path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21"></path>
+          </svg>
+        </div>
+        <div>
+          <p class="brand-kicker">Cowboy &middot; River</p>
+          <h1 class="brand-title">Hyperliquid trader</h1>
+        </div>
+      </div>
+      <div class="masthead-status">
+        <span id="live-dot" class="dot dot-demo"></span>
+        <span id="network-label" class="network-label">&mdash;</span>
+        <button id="refresh-btn" class="btn-refresh" type="button">
+          <span id="refresh-icon" class="refresh-icon" aria-hidden="true"></span>
+          Refresh
+        </button>
+      </div>
+    </header>
+
+    <div id="banner-slot"></div>
+
+    <section class="metric-grid metric-grid-4" id="account-metrics"></section>
+
+    <section class="metric-grid metric-grid-8" id="stat-metrics"></section>
+
+    <section class="columns">
+      <div class="column-main">
+
+        <article class="panel">
+          <div class="panel-head">
+            <h2 class="panel-title">Active thesis</h2>
+          </div>
+          <div id="thesis-list"></div>
+        </article>
+
+        <article class="panel panel-flush">
+          <div class="panel-head panel-head-bordered ideas-head">
+            <div>
+              <h2 class="panel-title">Trade ideas</h2>
+              <p class="panel-subtitle">Research outputs aligned with the active cross-asset thesis.</p>
+            </div>
+            <div class="filter-group" id="idea-filters">
+              <button type="button" class="filter-btn filter-active" data-filter="ALL">ALL</button>
+              <button type="button" class="filter-btn" data-filter="LONG">LONG</button>
+              <button type="button" class="filter-btn" data-filter="SHORT">SHORT</button>
+            </div>
+          </div>
+          <div id="ideas-list" class="divided"></div>
+        </article>
+
+        <article class="panel panel-flush">
+          <div class="panel-head panel-head-bordered">
+            <h2 class="panel-title">Execution book</h2>
+          </div>
+          <div id="positions-list" class="divided"></div>
+        </article>
+
+      </div>
+
+      <aside class="column-side">
+
+        <article class="panel">
+          <h2 class="panel-title">Pipeline</h2>
+          <div id="pipeline-list" class="pipeline"></div>
+        </article>
+
+        <div id="unfillable-slot"></div>
+
+        <article class="panel">
+          <h2 class="panel-title">Learned lessons</h2>
+          <div id="lessons-list" class="lessons"></div>
+        </article>
+
+        <article class="panel-dark">
+          <h2 class="panel-title">Actors</h2>
+          <dl class="actor-list">
+            <div>
+              <dt>Research</dt>
+              <dd id="research-addr" class="mono">Not deployed</dd>
+            </div>
+            <div>
+              <dt>Live execution</dt>
+              <dd id="trader-addr" class="mono">Not deployed</dd>
+            </div>
+          </dl>
+          <p class="actor-note">Read-only: this dashboard cannot place orders or mutate actor state.</p>
+        </article>
+
+      </aside>
+    </section>
+
+    <footer class="footer">
+      Updated <span id="updated-at">&mdash;</span> &middot; live execution state
+    </footer>
+
+  </div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

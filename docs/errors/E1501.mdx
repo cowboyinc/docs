@@ -1,0 +1,44 @@
+---
+title: "E1501 — Timer limit exceeded for actor"
+description: "Timer limit exceeded for actor"
+---
+
+# E1501 — Timer limit exceeded for actor
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1501` |
+| **Slug** | `E1501` |
+| **Category** | `timer` (Timer) |
+
+
+## What happened
+
+Timer limit exceeded for actor.
+
+## Why it happened
+
+The actor has reached the maximum number of active timers (1,024).
+
+## How to fix
+
+Cancel unused timers or request a higher limit.
+
+## Receipt example
+
+```json
+{
+  "code": 1501,
+  "slug": "E1501",
+  "category": "timer",
+  "what": "Timer limit exceeded for actor",
+  "fix": "Cancel unused timers or request a higher limit.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1501"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

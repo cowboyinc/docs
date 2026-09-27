@@ -1,0 +1,18 @@
+# STAGED: current node main supports schema v1 and rejects this manifest.
+# Schema v2 and [offchain] belong to the unmerged node off-chain project work
+# (node#1599/#1610, `cowboy init --offchain`; example:
+# node examples/offchain_score_report). Land that support before invoking the
+# CLI on this project.
+# This project has no actor target of its own:
+# the consumer is the Hyperliquid trading actor (cowboy-harness templates),
+# which awaits the generated proxy for `sign_hyperliquid_order`.
+schema_version = 2
+
+[offchain]
+context = "offchain"
+python = "3.12"
+resource_tier = "small"
+# Not yet a field the build reads: CIP-10 `secret_env` (cowboy-protocol#127)
+# is what the generated proxy must pass on `runner.container`, alongside
+# `secrets=`, for each function that reads a key from its environment.
+# secrets = ["HYPERLIQUID_PRIVATE_KEY"]

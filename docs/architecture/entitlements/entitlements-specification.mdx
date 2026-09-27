@@ -1,0 +1,449 @@
+---
+title: "Entitlements Specification"
+description: "Canonical, normative specification of Cowboy's entitlements system."
+---
+
+This document is the canonical specification for the Cowboy Entitlements system. It defines the data model, lifecycle, enforcement rules, and the normative entitlement registry.
+
+## 1. Scope and Goals
+
+**Goals**
+
+- Least privilege by default.
+- Deterministic enforcement.
+- Declarative and composable permissions.
+- Auditable on-chain state and history.
+
+**Non-goals**
+
+- UX design for entitlement configuration.
+- Runner market mechanisms and pricing.
+- Non-canonical, custom entitlement namespaces (reserved for a future release).
+
+## 2. Terminology
+
+- **Entitlement**: A permission granting access to a capability or resource.
+- **Actor entitlements**: The set of entitlements an actor **requires** to execute correctly.
+- **Runner entitlements**: The set of entitlements a runner **provides** to off-chain jobs.
+- **Attested entitlement**: A runner entitlement that requires verifiable evidence (e.g., TEE, region).
+- **Inheritable entitlement**: An entitlement that may be passed to child actors on spawn.
+- **Quota-bearing entitlement**: An entitlement that supports parameterized limits or allowlists.
+
+## 3. Canonical Data Model
+
+Entitlements are represented as **grants** with a canonical structure.
+
+### 3.1 Entitlement ID
+
+An entitlement ID is a dotted string:
+
+```
+http.fetch
+storage.kv
+econ.transfer
+sec.tee_required
+```
+
+### 3.2 Entitlement Grant
+
+An entitlement grant has the following fields:
+
+```
+EntitlementGrant {
+  id: string
+  params?: map<string, value>
+}
+```
+
+`params` MAY be omitted if the entitlement has no parameters. Parameter schemas are defined in the registry in Section 9.
+
+### 3.3 Actor Manifest (Requires)
+
+Actor deployment manifests MUST declare entitlements as a list of `EntitlementGrant`:
+
+```
+{
+  "entitlements": [
+    {"id": "econ.transfer", "params": {"max_amount": 1000}},
+    {"id": "http.fetch", "params": {"allowlist_domains": ["api.coingecko.com"]}}
+  ]
+}
+```
+
+### 3.4 Runner Attestation (Provides)
+
+Runner capability attestations MUST declare entitlements as a list of `EntitlementGrant`:
+
+```
+{
+  "capabilities": [
+    {"id": "http.fetch", "params": {"allowlist_domains": ["*"]}},
+    {"id": "sec.tee_required"}
+  ]
+}
+```
+
+## 4. Serialization and Signing
+
+Runner attestations are signed payloads to provide on-chain auditability.
+
+**Canonical serialization**: CBOR (RFC 8949 canonical CBOR) is used to serialize the attestation payload prior to signing.
+
+**Signature**: Runner EOA signs the CBOR-encoded payload using `secp256k1`.
+
+**Deterministic ordering**: Maps MUST be encoded with lexicographic key ordering as specified by canonical CBOR. Arrays MUST be sorted lexicographically by entitlement `id` prior to signing.
+
+## 5. On-chain Storage
+
+- **Actors**: required entitlements are stored in the actor deployment manifest (on-chain).
+- **Runners**: provided entitlements are stored in an on-chain `RunnerAttestation` record.
+
+### 5.1 RunnerAttestation Record
+
+```
+RunnerAttestation {
+  runner_id: Address
+  capabilities: [EntitlementGrant]
+  valid_from: u64
+  valid_until: u64
+  evidence_hash?: Hash
+  signature: Signature
+}
+```
+
+`evidence_hash` MAY commit to off-chain evidence (e.g., a TEE quote bundle). The canonical attestation record is the single source of truth for scheduler matching.
+
+**Time base**: `valid_from` and `valid_until` are **block heights** (`u64`), not timestamps. An attestation is valid when `valid_from <= current_block_height <= valid_until`.
+
+## 6. Enforcement Lifecycle
+
+1. **Deployment-Time Check (MUST)**  
+   The actor deployment transaction MUST be rejected if it declares unknown or invalid entitlements (see Section 10).
+
+2. **Scheduler Match (MUST)**  
+   A runner may be assigned to a job only if:
+
+   ```
+   Actor.requires ⊆ Runner.provides
+   ```
+
+   with parameter compatibility as defined in Section 8.
+
+3. **VM Syscall Gate (MUST)**  
+   Sensitive syscalls MUST fail deterministically if the corresponding entitlement is missing or its quota is exceeded.
+
+4. **Attestation Validity (MUST)**  
+   The scheduler MUST ignore runner attestations that are expired or invalidly signed.
+
+## 7. Inheritance Rules
+
+- Only entitlements explicitly marked **inheritable** in the registry MAY be inherited by child actors.
+- Inheritance is a strict subset: child entitlements MUST be within the parent's inheritable entitlements.
+
+### 7.1 Actor Immutability
+
+- **Actor code is immutable after deployment.** Regular actors cannot upgrade their code.
+- **Entitlements are immutable after deployment.** Any change to entitlements requires redeployment.
+- To "upgrade" a regular actor, deploy a new actor at a new address. The old actor MAY implement a migration pattern (e.g., forwarding calls to the new address).
+- **System actors** (e.g., governance, bridge, blob storage) MAY be upgraded in-place if they hold the `sys.upgrade` entitlement. See Section 9.2.
+
+## 8. Parameter Compatibility
+
+When an entitlement has parameters, a runner provides a **superset** of an actor’s requirements. Examples:
+
+- `allowlist_domains`: actor set must be a subset of runner’s allowlist, or runner uses `*`.
+- `max_*` quotas: runner’s quota must be greater than or equal to actor’s requirement.
+
+### 8.1 Parameter Types and Units
+
+Unless otherwise specified in the registry:
+
+- All `max_*` and `min_*` parameters are **unsigned integers**.
+- `max_amount` is measured in **base CBY units** (integer).
+- `max_bytes` is measured in **bytes** (integer).
+- `max_tokens` counts **model tokens** (integer).
+- `min_vram_gb` is measured in **GiB** (integer).
+
+### 8.2 Domain Matching
+
+- Domains are **case-insensitive** and MUST be normalized to ASCII punycode.
+- `*` denotes all domains.
+- `*.example.com` matches any subdomain of `example.com` but not the apex domain unless explicitly listed.
+- Exact matches (`api.example.com`) MUST match the normalized host.
+
+### 8.3 Set and Range Matching
+
+- For set parameters (e.g., `allowlist_domains`, `allowlist_assets`, `allowlist_contracts`), the actor’s set MUST be a subset of the runner’s set, or the runner MUST provide `*`.
+- For range parameters (e.g., `max_requests`, `max_tokens`, `max_bytes`), the runner’s value MUST be greater than or equal to the actor’s value.
+- For equality parameters (e.g., `region`, `tee_type`), the values MUST be equal.
+
+### 8.4 Domain Sets
+
+- `domain_set` references a curated set of domains defined by governance.
+- If both `domain_set` and `allowlist_domains` are provided, the effective allowlist is their **union**.
+- Runner matching MUST be performed against the effective allowlist.
+- A runner providing `allowlist_domains: ["*"]` is a **superset of all domain sets and explicit allowlists**. Wildcard always satisfies any actor domain requirement.
+
+## 9. Normative Entitlement Registry
+
+The following registry is canonical for v1. Any entitlement not listed here is invalid.
+
+### 9.1 Execution & Lifecycle
+
+| ID | Description | Inheritable | Attested | Quota | Params |
+| --- | --- | :---: | :---: | :---: | --- |
+| `exec.spawn` | Allow spawning child actors. | ✅ | ❌ | ✅ | `max_children` |
+
+### 9.2 System (Governance-Controlled)
+
+| ID | Description | Inheritable | Attested | Quota | Params |
+| --- | --- | :---: | :---: | :---: | --- |
+| `sys.upgrade` | Actor may upgrade its own code hash in-place. | ❌ | ❌ | ❌ | — |
+
+<Warning>
+  The `sys.upgrade` entitlement is reserved for system actors. Only addresses in the **System Deployer Allowlist** (defined in the genesis config at `genesis.system_deployers`) may deploy actors with this entitlement. Deployments from other addresses MUST be rejected. This entitlement cannot be revoked once granted.
+</Warning>
+
+### 9.3 Networking (HTTP Egress)
+
+| ID | Description | Inheritable | Attested | Quota | Params |
+| --- | --- | :---: | :---: | :---: | --- |
+| `http.fetch` | HTTP(S) egress via runner. | ✅ | ✅ | ✅ | `allowlist_domains`, `domain_set`, `max_requests` |
+
+### 9.3.1 Networking (HTTP Ingress)
+
+Added by CIP-14 (DNS-Addressable Actors §6.1). Enforced at the Gateway and Route Registry, not within the PVM.
+
+| ID | Description | Inheritable | Attested | Quota | Params |
+| --- | --- | :---: | :---: | :---: | --- |
+| `ingress.http` | Actor may receive inbound HTTP requests via Gateway. | ❌ | ❌ | ✅ | `allowlist_methods`, `max_request_bytes`, `max_response_bytes`, `max_query_cycles` |
+
+### 9.4 Storage & State
+
+| ID | Description | Inheritable | Attested | Quota | Params |
+| --- | --- | :---: | :---: | :---: | --- |
+| `storage.kv` | Access to actor KV store. | ✅ | ❌ | ✅ | `max_bytes` |
+| `storage.blob` | Blob I/O via system blob actor. | ✅ | ❌ | ✅ | `max_bytes` |
+
+### 9.5 Off-chain Compute
+
+| ID | Description | Inheritable | Attested | Quota | Params |
+| --- | --- | :---: | :---: | :---: | --- |
+| `oracle.llm` | Request LLM inference. | ❌ | ✅ | ✅ | `max_tokens`, `max_requests` |
+| `accel.gpu` | Require GPU for execution. | ❌ | ✅ | ✅ | `min_vram_gb` |
+
+### 9.6 Security & Privacy
+
+| ID | Description | Inheritable | Attested | Quota | Params |
+| --- | --- | :---: | :---: | :---: | --- |
+| `sec.tee_required` | Require execution in TEE. | ✅ | ✅ | ❌ | `tee_type` |
+| `sec.data_residency` | Require data to remain in a region. | ✅ | ✅ | ❌ | `region` |
+
+### 9.7 Economics & Funds
+
+| ID | Description | Inheritable | Attested | Quota | Params |
+| --- | --- | :---: | :---: | :---: | --- |
+| `econ.hold_balance` | Actor may hold a persistent CBY balance across executions. Without this, actors can only pass through funds within a single transaction. | ✅ | ❌ | ❌ | — |
+| `econ.transfer` | Actor may transfer CBY. | ❌ | ❌ | ✅ | `max_amount`, `max_per_block` |
+
+### 9.8 Timers & Scheduling
+
+| ID | Description | Inheritable | Attested | Quota | Params |
+| --- | --- | :---: | :---: | :---: | --- |
+| `timer.schedule` | Actor may schedule timers. | ✅ | ❌ | ✅ | `max_timers` |
+
+### 9.9 Interoperability (Ethereum)
+
+| ID | Description | Inheritable | Attested | Quota | Params |
+| --- | --- | :---: | :---: | :---: | --- |
+| `bridge.asset` | Bridge assets to/from Ethereum. | ❌ | ❌ | ✅ | `allowlist_assets` |
+| `bridge.subscribe_event` | Subscribe to Ethereum events. | ❌ | ❌ | ✅ | `allowlist_contracts` |
+
+### 9.10 Registry Governance and Versioning
+
+- The entitlement registry is defined by the protocol specification for a given protocol version.
+- Changes to the registry require governance approval and a protocol version update.
+- Nodes MUST reject any entitlement ID not present in the registry for their protocol version.
+
+### 9.11 Entitlement Deprecation and Removal
+
+When an entitlement is scheduled for removal, the following deprecation process applies:
+
+1. **Deprecation announcement**: A governance proposal marks the entitlement as `deprecated` starting at block height `H`.
+2. **Deprecation window**: For blocks `H` to `H + DEPRECATION_WINDOW`, the entitlement remains functional but:
+   - New actor deployments using the deprecated entitlement emit a warning event.
+   - The entitlement is flagged in on-chain queries and explorer UIs.
+3. **Removal**: At block `H + DEPRECATION_WINDOW + 1`:
+   - The entitlement is removed from the registry.
+   - Actors still holding the entitlement become **non-executable** until redeployed with a valid entitlement set.
+   - Scheduler MUST NOT assign jobs to non-executable actors.
+
+**DEPRECATION_WINDOW**: The minimum deprecation window is defined by governance, with a recommended default of 604,800 blocks (~7 days at 1s block time).
+
+**Non-executable state**: An actor in non-executable state:
+- Retains its on-chain state and balance.
+- Cannot process messages or be scheduled.
+- Can be redeployed by its owner with an updated manifest.
+- Emits `ActorNonExecutable` event at the block of removal.
+
+### 9.12 Parameter Schemas
+
+| Param | Type | Description |
+| --- | --- | --- |
+| `max_children` | `u64` | Max child actors that may be spawned. |
+| `allowlist_domains` | `array<string>` | Hostnames or `*` wildcard. |
+| `domain_set` | `string` | Name of curated domain set. |
+| `max_requests` | `u64` | Max HTTP or LLM requests per execution. |
+| `max_bytes` | `u64` | Byte limit for storage or blob I/O. |
+| `max_tokens` | `u64` | Max tokens per LLM request within a single execution. |
+| `min_vram_gb` | `u64` | Minimum GPU VRAM in GiB. |
+| `tee_type` | `string` | TEE type identifier (see Section 9.13). |
+| `region` | `string` | Region identifier (see Section 9.14). |
+| `max_amount` | `u64` | Max CBY amount per transfer (base units). |
+| `max_per_block` | `u64` | Max CBY total per block (base units). |
+| `max_timers` | `u64` | Max active timers per actor. |
+| `allowlist_assets` | `array<string>` | Asset identifiers (e.g., token addresses). |
+| `allowlist_contracts` | `array<Address>` | Contract addresses permitted for subscriptions. |
+| `allowlist_methods` | `array<string>` | HTTP methods the actor accepts for ingress; `*` permits all. |
+| `max_request_bytes` | `u64` | Maximum ingress request body size in bytes. |
+| `max_response_bytes` | `u64` | Maximum ingress response body size in bytes. |
+| `max_query_cycles` | `u64` | Maximum PVM cycles per query-path ingress request. |
+
+### 9.13 Canonical TEE Types
+
+Valid `tee_type` values are:
+
+- `sgx`
+- `sev`
+- `tdx`
+
+### 9.14 Canonical Regions
+
+Valid `region` values are:
+
+- `us`
+- `eu`
+- `uk`
+- `cn`
+- `apac`
+
+## 10. Validation Rules
+
+- **Unknown entitlements are invalid** (custom entitlements are not allowed in v1).
+- **Parameter schemas are mandatory** when the registry lists params.
+- **Duplicate entitlements** MUST be rejected (only one grant per ID).
+- **Invalid parameter types or units** MUST be rejected.
+- **Non-canonical domain formats** MUST be rejected.
+- **Entitlement lists MUST be sorted** lexicographically by `id`.
+- **`sys.upgrade` is restricted**: Deployments including `sys.upgrade` from addresses not in `genesis.system_deployers` MUST be rejected with `ERR_SYSTEM_ENTITLEMENT_UNAUTHORIZED`.
+
+## 11. Errors and Determinism
+
+Missing entitlements and quota violations MUST result in deterministic VM traps:
+
+- `ERR_MISSING_ENTITLEMENT`
+- `ERR_ENTITLEMENT_QUOTA_EXCEEDED`
+- `ERR_ENTITLEMENT_PARAM_INVALID`
+- `ERR_ACTOR_NON_EXECUTABLE` (actor holds deprecated/removed entitlement)
+- `ERR_SYSTEM_ENTITLEMENT_UNAUTHORIZED` (non-system deployer requested `sys.upgrade`)
+
+## 12. Examples
+
+### 12.1 Trading Bot (Actor Manifest)
+
+```
+{
+  "entitlements": [
+    {"id": "econ.transfer", "params": {"max_amount": 1000}},
+    {"id": "http.fetch", "params": {"allowlist_domains": ["api.coingecko.com"]}},
+    {"id": "oracle.llm", "params": {"max_tokens": 2000}},
+    {"id": "storage.kv", "params": {"max_bytes": 1048576}},
+    {"id": "timer.schedule", "params": {"max_timers": 10}}
+  ]
+}
+```
+
+### 12.2 Runner Attestation
+
+```
+{
+  "runner_id": "0x...",
+  "capabilities": [
+    {"id": "http.fetch", "params": {"allowlist_domains": ["*"]}},
+    {"id": "oracle.llm", "params": {"max_tokens": 100000}},
+    {"id": "sec.tee_required", "params": {"tee_type": "sgx"}}
+  ],
+  "valid_from": 1700000000,
+  "valid_until": 1710000000,
+  "evidence_hash": "0x...",
+  "signature": "0x..."
+}
+```
+
+## Appendix A: CDDL Schema
+
+The following CDDL (RFC 8610) schema defines the canonical wire format for entitlements.
+
+```cddl
+; Entitlement grant
+entitlement-grant = {
+  id: tstr,
+  ? params: param-map
+}
+
+; Parameter map (keys and values depend on entitlement)
+param-map = {
+  * tstr => param-value
+}
+
+param-value = uint / tstr / [* tstr] / [* address]
+
+; Address is a 20-byte value
+address = bstr .size 20
+
+; Hash is a 32-byte value
+hash = bstr .size 32
+
+; Signature is a 65-byte secp256k1 recoverable signature
+signature = bstr .size 65
+
+; Actor manifest entitlements array (sorted by id)
+actor-entitlements = [* entitlement-grant]
+
+; Runner attestation record
+runner-attestation = {
+  runner_id: address,
+  capabilities: [* entitlement-grant],
+  valid_from: uint,
+  valid_until: uint,
+  ? evidence_hash: hash,
+  signature: signature
+}
+
+; Signing preimage (excludes signature field)
+runner-attestation-preimage = {
+  capabilities: [* entitlement-grant],
+  ? evidence_hash: hash,
+  runner_id: address,
+  valid_from: uint,
+  valid_until: uint
+}
+```
+
+## Appendix B: CBOR Signing Preimage
+
+The runner attestation is signed over the CBOR-encoded payload below. Keys are sorted lexicographically, and arrays are sorted by entitlement `id`:
+
+```
+{
+  "capabilities": [
+    {"id": "http.fetch", "params": {"allowlist_domains": ["*"]}},
+    {"id": "oracle.llm", "params": {"max_tokens": 100000}},
+    {"id": "sec.tee_required", "params": {"tee_type": "sgx"}}
+  ],
+  "evidence_hash": "0x...",
+  "runner_id": "0x...",
+  "valid_from": 1700000000,
+  "valid_until": 1710000000
+}
+```

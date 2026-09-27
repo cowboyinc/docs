@@ -1,0 +1,44 @@
+---
+title: "E1408 — Transfer hook rejected the transfer"
+description: "Transfer hook rejected the transfer"
+---
+
+# E1408 — Transfer hook rejected the transfer
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1408` |
+| **Slug** | `E1408` |
+| **Category** | `token` (Token (CIP-20)) |
+| **CIP** | CIP-20 |
+
+## What happened
+
+Transfer hook rejected the transfer.
+
+## Why it happened
+
+The token's transfer hook actor returned `false`, rejecting the transfer.
+
+## How to fix
+
+Review the hook actor's policy to understand why the transfer was rejected.
+
+## Receipt example
+
+```json
+{
+  "code": 1408,
+  "slug": "E1408",
+  "category": "token",
+  "what": "Transfer hook rejected the transfer",
+  "fix": "Review the hook actor's policy to understand why the transfer was rejected.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1408"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

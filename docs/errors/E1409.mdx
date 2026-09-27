@@ -1,0 +1,44 @@
+---
+title: "E1409 — Transfer hook attempted reentrancy"
+description: "Transfer hook attempted reentrancy"
+---
+
+# E1409 — Transfer hook attempted reentrancy
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1409` |
+| **Slug** | `E1409` |
+| **Category** | `token` (Token (CIP-20)) |
+| **CIP** | CIP-20 §8 |
+
+## What happened
+
+Transfer hook attempted reentrancy.
+
+## Why it happened
+
+The transfer hook tried to call back into the token registry, which is forbidden.
+
+## How to fix
+
+Reentrancy from transfer hooks is forbidden by CIP-20 §8. Restructure the hook logic.
+
+## Receipt example
+
+```json
+{
+  "code": 1409,
+  "slug": "E1409",
+  "category": "token",
+  "what": "Transfer hook attempted reentrancy",
+  "fix": "Reentrancy from transfer hooks is forbidden by CIP-20 §8.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1409"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

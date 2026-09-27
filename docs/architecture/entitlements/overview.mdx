@@ -1,0 +1,100 @@
+---
+title: "Entitlements Overview"
+description: "Understanding Cowboy's declarative permissions system for actors and runners."
+---
+
+<Note>
+  This page is a high-level introduction. The canonical, normative rules,
+  registry, and enforcement details are defined in the
+  <a href="/architecture/entitlements/entitlements-specification">Entitlements Specification</a>.
+</Note>
+
+The Cowboy protocol integrates a sophisticated, granular permissions system known as the **Entitlements Framework**. It is designed to enforce the principle of least privilege by default, ensuring that actors and runners only have access to the resources they absolutely need.
+
+<Info>
+  **Key Idea**: Entitlements are declarative, composable, and auditable on-chain permissions that govern the capabilities of actors and runners, from network access to economic actions.
+</Info>
+
+
+## Core Concepts
+
+The framework operates on a simple but powerful matching model between the needs of actors and the capabilities of runners.
+
+<CardGroup cols={2}>
+  <Card title="Actor Requires" icon="hand-holding-box">
+    At deployment, an actor's manifest must declare an array of entitlements it **requires** to function. For example, an oracle actor might require `http.fetch` to make external web requests.
+  </Card>
+  <Card title="Runner Provides" icon="shield-check">
+    A Runner, via a signed on-chain attestation, declares an array of entitlements it can **provide**. For example, a Runner in a secure enclave might provide the `sec.tee_required` entitlement.
+  </Card>
+</CardGroup>
+
+## Actor Immutability
+
+Regular actors are **immutable after deployment**—their code and entitlements cannot change. To "upgrade" an actor, deploy a new actor at a new address. The old actor can implement a migration pattern (e.g., forwarding calls to the new address).
+
+**System actors** (governance, bridge, blob storage) are an exception: they may hold the `sys.upgrade` entitlement, allowing in-place code upgrades via governance.
+
+## Enforcement Lifecycle
+
+The protocol enforces entitlements at multiple stages to ensure continuous compliance.
+
+<Steps>
+  <Step title="1. Scheduling Match">
+    The scheduler will only assign an off-chain job to a Runner if the Runner's `provides` set is a superset of the actor's `requires` set.
+    
+    `Runner.provides ⊇ Actor.requires`
+  </Step>
+  <Step title="2. VM Syscall Gate">
+    Every sensitive system call within the PVM is gated by an entitlement check. If an actor attempts a privileged operation (e.g., sending funds) without the corresponding `econ.transfer` entitlement, the VM will trap with a deterministic error.
+  </Step>
+  <Step title="3. Attestation Expiry">
+    The framework defines a clear lifecycle for permissions. If a Runner's attestation for a critical entitlement (e.g., a TEE quote) expires, the scheduler will no longer assign it relevant tasks. This ensures actors operate within their declared security requirements.
+  </Step>
+</Steps>
+
+## Normative Entitlement Set
+
+The complete set of entitlements defined at the protocol level. Unknown entitlements are invalid in v1.
+
+| ID | Description | Inh | Att | Quota |
+| :--- | :--- | :---: | :---: | :---: |
+| **Execution** |
+| `exec.spawn` | Spawn child actors | ✅ | ❌ | ✅ |
+| **System** |
+| `sys.upgrade` | Upgrade code in-place (governance only) | ❌ | ❌ | ❌ |
+| **Networking** |
+| `http.fetch` | HTTP(S) egress via runner | ✅ | ✅ | ✅ |
+| **Storage** |
+| `storage.kv` | Actor KV store access | ✅ | ❌ | ✅ |
+| `storage.blob` | Blob I/O via system actor | ✅ | ❌ | ✅ |
+| **Off-chain Compute** |
+| `oracle.llm` | LLM inference | ❌ | ✅ | ✅ |
+| `accel.gpu` | Require GPU | ❌ | ✅ | ✅ |
+| **Security** |
+| `sec.tee_required` | Require TEE (SGX/SEV/TDX) | ✅ | ✅ | ❌ |
+| `sec.data_residency` | Require geo-residency | ✅ | ✅ | ❌ |
+| **Economics** |
+| `econ.hold_balance` | Hold persistent CBY balance | ✅ | ❌ | ❌ |
+| `econ.transfer` | Transfer CBY | ❌ | ❌ | ✅ |
+| **Timers** |
+| `timer.schedule` | Schedule timers | ✅ | ❌ | ✅ |
+| **Ethereum Interop** |
+| `bridge.asset` | Bridge assets to/from Ethereum | ❌ | ❌ | ✅ |
+| `bridge.subscribe_event` | Subscribe to Ethereum events | ❌ | ❌ | ✅ |
+
+### Key
+- **Inh** (Inheritable): Can be passed to child actors
+- **Att** (Attested): Runner must prove via signed attestation
+- **Quota**: Supports parameterized limits (e.g., `max_bytes`, `allowlist_domains`)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Actor VM Overview" icon="microchip" href="/architecture/actor-vm/overview">
+    Learn about the execution environment where entitlements are enforced.
+  </Card>
+  <Card title="Off-Chain Compute" icon="server" href="/architecture/offchain/overview">
+    See how entitlements match actors with capable runners.
+  </Card>
+</CardGroup>

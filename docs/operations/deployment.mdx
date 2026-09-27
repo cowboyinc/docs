@@ -1,0 +1,127 @@
+---
+title: "Deployment Guide"
+description: "Deploy a Cowboy validator network — config generation with the setup binary, the validator YAML and genesis reference, the container image, and the CI deploy pipeline."
+---
+
+This guide covers deploying a **multi-node Cowboy validator network**. For a
+single local node, see [Getting Started](/getting-started/quickstart) and the
+[Configuration reference](/references/configuration); this page picks up where
+those leave off.
+
+## 1. Generate configs and genesis
+
+All deployment configs and the genesis file are produced by the `setup` binary
+(`node/validator/src/setup.rs`). It has two modes under `generate`:
+
+<Tabs>
+<Tab title="Local (dev)">
+```bash
+cargo run -p validator --bin setup -- generate local \
+  --peers 4 --bootstrappers 1 \
+  --worker-threads 4 --signature-threads 2 \
+  --message-backlog 1024 --mailbox-size 1024 --deque-size 1024 \
+  --log-level info --start-port 4000 \
+  --output ./test
+```
+</Tab>
+<Tab title="Remote (AWS)">
+```bash
+cargo run -p validator --bin setup -- generate remote \
+  --peers 4 --bootstrappers 1 \
+  --worker-threads 8 --signature-threads 4 \
+  --message-backlog 1024 --mailbox-size 1024 --deque-size 1024 \
+  --log-level info --start-port 4000 \
+  --regions us-east-1,eu-west-1 \
+  --instance-type t3.xlarge --storage-size 200 \
+  --monitoring-instance-type t3.large --monitoring-storage-size 100 \
+  --dashboard ./monitoring/dashboard.json \
+  --output ./deploy
+```
+</Tab>
+</Tabs>
+
+**Output** (written to `--output`):
+
+| File | Purpose |
+|---|---|
+| `genesis.json` | Genesis state — accounts, `total_supply`, `chain_id`, `network`, pre-registered relay nodes |
+| `<pubkey>.yaml` | One validator config per peer (consensus key + share, ports, `directory`) |
+| `peers.yaml` | Peer address map (P2P) |
+| `<address>.yaml` | secp256k1 user keypairs for CLI use |
+| `config.yaml` *(remote only)* | AWS deployer config — instances, regions, monitoring |
+| `dashboard.json` *(remote only)* | Grafana dashboard, copied from `--dashboard` |
+
+`remote` adds the AWS-specific flags (`--regions`, `--instance-type`,
+`--storage-size`, `--monitoring-instance-type`, `--monitoring-storage-size`,
+`--dashboard`, and the optional `--indexer-url` / `--indexer-count` pair). EBS
+volumes use storage class `gp3`.
+
+## 2. Validator configuration
+
+Each `<pubkey>.yaml` is the validator's runtime config. The fields that matter
+for a deployment (full list in the [Configuration reference](/references/configuration)):
+
+| Field | Notes |
+|---|---|
+| `private_key`, `share`, `polynomial` | Consensus signing key + BLS threshold material — **secrets**, back them up (see [Snapshots & Restore](/operations/snapshots-and-restore)) |
+| `port` | P2P consensus port |
+| `rpc_port` | HTTP RPC port; **omit to disable RPC** on this validator |
+| `metrics_port` | Prometheus `/metrics` port |
+| `directory` | State / QMDB storage root — the bulk of what you back up |
+| `genesis_config_path` | Path to `genesis.json` (relative paths resolve against the config file's directory) |
+| `allowed_peers`, `bootstrappers` | Ed25519 peer public keys; bootstrappers are the initial-contact subset |
+| `enable_faucet` | **Default `false`.** Only honored on `chain_id` 1 (local) or 100 (dev); keep `false` on any real network |
+| `chain_id`, `network` | Replay-protection + delegation-cert domain separation; inherited from `genesis.json` if omitted |
+| `indexer` | Optional indexer URL the validator pushes seeds / notarizations / finalizations to |
+
+`chain_id` and `network` are read from `genesis.json` at startup when not set in
+the YAML, so the genesis file is the single source of truth for network identity.
+
+## 3. Container image
+
+CI publishes a validator image to `ghcr.io/cowboyinc/validator` tagged with the
+branch, `sha-<hash>`, and the release version. Run it with the generated YAML +
+genesis mounted, exposing the P2P, RPC, and metrics ports. For a from-source
+run instead, build the release binaries (`cargo build --release`, producing
+`validator`, `setup`, `indexer`, `cowboy`, `cowboy-ras-write-relayer`).
+
+<Warning>
+The repo's `scripts/restart_validator.sh` is a **local-devnet** helper that
+**deletes state** on restart. Never use it in production — manage the validator
+with systemd / your orchestrator instead. See
+[Incident Response](/operations/incident-response#restart-safely).
+</Warning>
+
+## 4. Deploy pipeline
+
+The reference deploy flow lives in `node/.github/workflows/pipeline.yml` and
+`promote.yml`:
+
+1. **CI gates** — `fmt` → `lint` → sharded `test` (+ a PVM simulation suite and a
+   release-build assertion).
+2. **Build Binaries** — `cargo build --release`, artifacts uploaded to S3.
+3. **Package image** — Docker image pushed to `ghcr.io/cowboyinc/validator`.
+4. **Deploy Dev** — on `main`, an SSM command rolls the new binary onto the dev
+   validator.
+5. **Promote** (`promote.yml`) — a `stg-v*` / `prd-v*` tag resolves the
+   dev-built binary and does a **rolling** SSM deploy in a safe order:
+   **non-bootstrapper validators → the bootstrapper (validator-01) → RPC nodes**,
+   each node stopping its services, downloading the binary, and restarting before
+   the next.
+
+Promotion to staging/prod is gated on a tests-passed marker from the dev run, so
+only binaries that passed CI on dev are eligible.
+
+## 5. Post-deploy verification
+
+After a node starts, confirm health (see [Incident Response](/operations/incident-response#health-surfaces)):
+
+```bash
+curl -s http://<node>:<rpc_port>/health            # {"status":"ok"}
+curl -s http://<node>:<rpc_port>/health/detailed   # height, mempool, component status
+curl -s http://<node>:<metrics_port>/metrics       # Prometheus scrape
+```
+
+A freshly-joined node catches up via state-sync (see
+[Snapshots & Restore](/operations/snapshots-and-restore#fast-sync-rebuild-from-a-peer)); watch
+`block_height` on `/health/detailed` climb toward the network tip.

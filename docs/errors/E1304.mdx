@@ -1,0 +1,44 @@
+---
+title: "E1304 — Entitlement conflict"
+description: "Entitlement conflict"
+---
+
+# E1304 — Entitlement conflict
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1304` |
+| **Slug** | `E1304` |
+| **Category** | `entitlement` (Entitlement) |
+
+
+## What happened
+
+Entitlement conflict.
+
+## Why it happened
+
+An entitlement re-grant attempted to change immutable constraint fields.
+
+## How to fix
+
+Keep the entitlement's immutable constraint fields stable across re-grants.
+
+## Receipt example
+
+```json
+{
+  "code": 1304,
+  "slug": "E1304",
+  "category": "entitlement",
+  "what": "Entitlement conflict",
+  "fix": "Keep the entitlement's immutable constraint fields stable across re-grants.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1304"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

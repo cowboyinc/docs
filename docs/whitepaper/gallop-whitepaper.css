@@ -1,0 +1,318 @@
+@font-face {
+  font-family: "Season Sans VF";
+  src: url("../fonts/SeasonSansVF.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Season Mix VF";
+  src: url("../fonts/SeasonMixVF.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+
+:root {
+  --hay-50: #fdfcfb;
+  --hay-100: #f9f7f5;
+  --hay-200: #f4f0eb;
+  --hay-500: #e6ded6;
+  --hay-700: #d9cfc4;
+  --bison-300: #72675f;
+  --bison-500: #4c433c;
+  --bison-600: #3d3530;
+  --bison-900: #1d1916;
+  --nugget-50: #fff7eb;
+  --nugget-500: #ff9d14;
+  --nugget-700: #a85700;
+}
+
+@page {
+  size: Letter;
+  margin: 0.70in 0.76in 0.62in;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color: var(--bison-900);
+  background: white;
+  font-family: "Season Sans VF", Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 10.5pt;
+  font-variant-ligatures: common-ligatures;
+  line-height: 1.42;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+body {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+#title-block-header {
+  margin: 0 0 18pt;
+  padding: 0;
+  text-align: left;
+}
+
+#title-block-header::before {
+  display: block;
+  margin: 0 0 14pt;
+  color: var(--nugget-700);
+  content: "COWBOY \00B7  WHITEPAPER SERIES";
+  font-size: 8.7pt;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+#title-block-header::after {
+  display: block;
+  width: 54pt;
+  height: 3pt;
+  margin-top: 16pt;
+  border-radius: 999px;
+  background: var(--nugget-500);
+  content: "";
+}
+
+#title-block-header .title {
+  margin: 0;
+  max-width: 92%;
+  color: var(--bison-900);
+  font-family: "Season Sans VF", Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 28pt;
+  font-weight: 650;
+  letter-spacing: -0.038em;
+  line-height: 1.06;
+}
+
+#title-block-header .subtitle,
+#title-block-header .author,
+#title-block-header .date {
+  display: none;
+}
+
+body > table:first-of-type {
+  display: block;
+  margin: 0 0 24pt;
+  padding: 15pt 17pt;
+  border: 1px solid var(--hay-700);
+  border-radius: 9pt;
+  background: var(--hay-100);
+  break-inside: avoid;
+}
+
+body > table:first-of-type colgroup,
+body > table:first-of-type thead {
+  display: none;
+}
+
+body > table:first-of-type tbody {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 13pt 22pt;
+  width: 100%;
+}
+
+body > table:first-of-type tr {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  break-inside: avoid;
+}
+
+body > table:first-of-type td {
+  display: block;
+  width: auto !important;
+  padding: 0;
+  border: 0;
+}
+
+body > table:first-of-type td:first-child {
+  margin-bottom: 3pt;
+  color: var(--bison-500);
+  font-size: 7.6pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+body > table:first-of-type td:last-child {
+  color: var(--bison-900);
+  font-size: 9.7pt;
+  line-height: 1.25;
+}
+
+p {
+  margin: 0 0 8.5pt;
+  orphans: 3;
+  widows: 3;
+}
+
+strong {
+  font-weight: 700;
+}
+
+em {
+  font-style: italic;
+}
+
+a {
+  color: var(--nugget-700);
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  color: var(--bison-900);
+  font-family: "Season Mix VF", Georgia, ui-serif, serif;
+  font-weight: 620;
+  letter-spacing: -0.025em;
+  break-after: avoid-page;
+  page-break-after: avoid;
+}
+
+h2 {
+  margin: 25pt 0 10pt;
+  padding-top: 9pt;
+  border-top: 2px solid var(--nugget-500);
+  font-size: 22pt;
+  line-height: 1.08;
+}
+
+h3 {
+  margin: 17pt 0 7pt;
+  font-size: 16pt;
+  line-height: 1.15;
+}
+
+h4 {
+  margin: 13pt 0 6pt;
+  font-size: 12.5pt;
+  line-height: 1.18;
+}
+
+blockquote {
+  margin: 0 0 24pt;
+  padding: 11pt 15pt;
+  border-left: 2.5pt solid var(--nugget-500);
+  border-radius: 0 6pt 6pt 0;
+  background: var(--nugget-50);
+  color: var(--bison-600);
+  break-inside: avoid;
+}
+
+blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+ul,
+ol {
+  margin: 6pt 0 10pt;
+  padding-left: 24pt;
+}
+
+li {
+  margin: 0 0 4.5pt;
+  padding-left: 2pt;
+  break-inside: avoid;
+}
+
+li::marker {
+  color: var(--nugget-700);
+  font-weight: 700;
+}
+
+code {
+  padding: 0.04em 0.23em;
+  border-radius: 3px;
+  background: var(--hay-200);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.86em;
+  overflow-wrap: anywhere;
+}
+
+pre {
+  margin: 10pt 0 12pt;
+  padding: 13pt 15pt;
+  border: 1px solid var(--hay-700);
+  border-radius: 7pt;
+  background: var(--hay-100);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 8.2pt;
+  line-height: 1.38;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  break-inside: avoid;
+}
+
+pre code {
+  padding: 0;
+  background: transparent;
+  font-size: inherit;
+}
+
+table {
+  width: 100%;
+  margin: 10pt 0 14pt;
+  border-collapse: collapse;
+  font-size: 8.5pt;
+  line-height: 1.3;
+}
+
+thead {
+  background: var(--hay-100);
+}
+
+th,
+td {
+  padding: 6pt 7pt;
+  border-bottom: 1px solid var(--hay-700);
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--bison-600);
+  font-size: 7.4pt;
+  font-weight: 700;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+tr {
+  break-inside: avoid;
+}
+
+hr {
+  height: 2px;
+  margin: 24pt 0 15pt;
+  border: 0;
+  background: var(--nugget-500);
+}
+
+body > p:last-of-type {
+  color: var(--bison-500);
+}
+
+@media print {
+  h2,
+  h3,
+  h4 {
+    break-after: avoid-page;
+  }
+
+  table,
+  pre,
+  blockquote {
+    break-inside: avoid;
+  }
+}

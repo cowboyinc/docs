@@ -1,0 +1,34 @@
+{
+  "source": "https://docs.reducto.ai/api-reference/parse",
+  "openapi": "https://platform.reducto.ai/openapi.json",
+  "base_url": "https://platform.reducto.ai",
+  "endpoint": "https://platform.reducto.ai/parse",
+  "method": "POST",
+  "operation_id": "parse",
+  "auth": {"in": "header", "name": "Authorization", "secret": "REDUCTO_API_KEY", "scheme": "Bearer"},
+  "request": {
+    "required": ["input"],
+    "force_url_result_path": "settings.force_url_result"
+  },
+  "wrapper_inputs": ["hire_id", "document_url"],
+  "allowed_input_schemes": ["https://", "http://", "reducto://", "jobid://"],
+  "success_result": {"type": "url", "fields": ["type", "url", "result_id"]},
+  "error_envelope": "detail",
+  "excluded_endpoints": [
+    "/parse inline full result (type=full inline chunks park over the transport cap)",
+    "/parse_async (result via API-key-authenticated GET /job/{id}, not handable to the buyer)",
+    "/extract (schema-dependent inline result size is unbounded and can park)",
+    "/split",
+    "/pipeline",
+    "/upload"
+  ],
+  "bounds": {
+    "max_url_chars": 2048,
+    "max_result_url_chars": 4096,
+    "max_id_chars": 200,
+    "max_error_chars": 500,
+    "max_request_bytes": 8000,
+    "runner_result_bytes": 65536,
+    "result_bytes": 38000
+  }
+}

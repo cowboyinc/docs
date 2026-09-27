@@ -1,0 +1,488 @@
+---
+title: Reader Paths
+description: Recommended reading paths based on your role and interests
+icon: sitemap
+---
+
+## Introduction
+
+The Cowboy documentation is comprehensive and covers many topics. This guide helps you find the most relevant content based on your **role**, **experience level**, and **goals**.
+
+<Tip>
+  **Not sure where to start?** Follow the path that best matches your situation below.
+</Tip>
+
+## By Role
+
+### Application Developer
+
+**Goal**: Build actors (smart contracts) on Cowboy
+
+**You should focus on**:
+1. High-level concepts
+2. SDK usage
+3. Actor patterns
+4. Deployment
+
+**Recommended Path**:
+
+<Steps>
+  <Step title="Quick Overview">
+    [What is Cowboy?](/introduction/what-is-cowboy) (5 min)
+    
+  </Step>
+  
+  <Step title="Hands-On Start">
+    [Quickstart](/getting-started/quickstart) — initialize the CLI and deploy the hello actor on devnet
+  </Step>
+
+  <Step title="SDK Mastery">
+    [SDK Overview](/developers/sdk) — the `@actor` decorator, `self.storage`, and `runner.continuation` FSM (CIP-6)
+
+    [Examples Curriculum](/developers/examples) — source-checkout examples from first actor through runner-backed agents
+  </Step>
+
+  <Step title="Best Practices">
+    [Best Practices](/developers/best-practices)
+
+    [Style Guide](/style/styleguide) · [Glossary](/style/glossary)
+  </Step>
+
+  <Step title="Advanced Topics">
+    [Actor VM Overview](/architecture/actor-vm/overview)
+
+    [Fee Model](/architecture/fees/overview)
+
+    [Transaction Format](/developers/tx-format)
+  </Step>
+</Steps>
+
+**Skip** (for now):
+- Core protocol implementation details
+- Consensus mechanisms
+- Validator operations
+
+---
+
+### Protocol Developer
+
+**Goal**: Contribute to Cowboy core or build infrastructure
+
+**You should focus on**:
+1. Architecture deep dives
+2. Protocol specifications (CIPs)
+3. Implementation details
+4. Consensus and networking
+
+**Recommended Path**:
+
+<Steps>
+  <Step title="Foundation">
+    [What is Cowboy?](/introduction/what-is-cowboy) (5 min)
+    
+    [Design Principles](/overview/design-principles) (15 min)
+    
+    [Architecture Overview](/overview/architecture) (20 min)
+  </Step>
+  
+  <Step title="Deep Dive: Actor VM">
+    [Actor VM Overview](/architecture/actor-vm/overview) (20 min)
+    
+    [Determinism & Sandboxing](/architecture/actor-vm/determinism-and-sandbox) (30 min)
+    
+    [Resource Limits](/architecture/actor-vm/resource-limits) (15 min)
+  </Step>
+  
+  <Step title="Deep Dive: Fee System">
+    [Fee Model Overview](/architecture/fees/overview) (20 min)
+    
+    [Dual EIP-1559](/architecture/fees/dual-eip1559) (30 min)
+    
+    [Metering Points](/architecture/fees/metering-points) (45 min)
+    
+    [Worked Example](/architecture/fees/worked-example) (60 min)
+  </Step>
+  
+  <Step title="Deep Dive: Scheduler">
+    [Scheduler Overview](/architecture/scheduler/overview)
+  </Step>
+  
+  <Step title="Deep Dive: Off-Chain Compute">
+    [Off-Chain Overview](/architecture/offchain/overview)
+  </Step>
+  
+  <Step title="Codebase">
+    [Source Layout](/getting-started/repo-layout) (15 min)
+    
+    [Contributing Guide](/contributing/how-to-propose) (20 min)
+  </Step>
+</Steps>
+
+**Key Documents**:
+- [Scheduler Overview](/architecture/scheduler/overview)
+- [Off-Chain Overview](/architecture/offchain/overview)
+- [Fee Model Overview](/architecture/fees/overview)
+
+---
+
+### AI/ML Engineer
+
+**Goal**: Build autonomous AI agents on Cowboy
+
+**You should focus on**:
+1. Off-chain compute capabilities
+2. Python actor development
+3. Model inference patterns
+4. Data handling
+
+**Recommended Path**:
+
+<Steps>
+  <Step title="Overview">
+    [What is Cowboy?](/introduction/what-is-cowboy) (5 min)
+    
+    
+    Focus on "Verifiable Off-Chain Compute" section
+  </Step>
+  
+  <Step title="Quick Start">
+    [Quickstart Guide](/getting-started/quickstart)
+  </Step>
+  
+  <Step title="Off-Chain Deep Dive">
+    [Off-Chain Compute Overview](/architecture/offchain/overview) (30 min)
+    
+    [Task Lifecycle](/architecture/offchain/lifecycle) (40 min)
+    
+    **This is your key feature!**
+  </Step>
+  
+  <Step title="SDK for AI">
+    [SDK Overview](/developers/sdk) — `runner.llm()`, `runner.http()`, `runner.mcp()` continuation patterns
+
+    Study the runner and LLM lessons in the examples curriculum
+  </Step>
+
+  <Step title="Runner Economics">
+    Understand Runner Economics (see Off-Chain Overview)
+
+    Learn how pricing works for compute tasks
+  </Step>
+</Steps>
+
+**Key Features for You**:
+- ✅ LLM / HTTP / MCP executors (CIP-2)
+- ✅ Verifiable result submission (N-of-M, TEE, or ZK)
+- ✅ Continuation FSM for async callbacks (CIP-6)
+- ✅ CBFS for model weights and dataset storage
+
+---
+
+### DeFi Developer
+
+**Goal**: Build DeFi protocols (DEX, lending, derivatives)
+
+**You should focus on**:
+1. Actor patterns
+2. Gas optimization
+3. Security (reentrancy, etc.)
+4. Transaction atomicity
+
+**Recommended Path**:
+
+<Steps>
+  <Step title="Basics">
+    [What is Cowboy?](/introduction/what-is-cowboy) (5 min)
+    
+    [Quickstart Guide](/getting-started/quickstart) (15 min)
+  </Step>
+  
+  <Step title="SDK & Patterns">
+    [SDK Overview](/developers/sdk) · [Example Actors](/developers/examples)
+  </Step>
+
+  <Step title="Security (Critical!)">
+    Review scheduling and congestion handling (CIP-1), determinism constraints, and best practices.
+  </Step>
+  
+  
+  
+  <Step title="Gas Optimization">
+    [Fee Model Overview](/architecture/fees/overview) (20 min)
+    
+    [Worked Example](/architecture/fees/worked-example) (30 min)
+    
+    Understand dual-gas system
+  </Step>
+  
+  <Step title="Advanced Patterns">
+    - Flash loans (via atomic transactions)
+    - Oracle integration (via off-chain compute)
+    - Governance (via timers for delayed execution)
+  </Step>
+</Steps>
+
+**DeFi-Specific Considerations**:
+- ✅ Native timers for scheduled execution (CIP-1)
+- ✅ Dual-metered pricing for compute vs data (CIP-3)
+
+---
+
+### Security Researcher
+
+**Goal**: Audit actors or find protocol vulnerabilities
+
+**You should focus on**:
+1. Security model
+2. Attack vectors
+3. Gas economics
+4. Consensus safety
+
+**Recommended Path**:
+
+<Steps>
+  <Step title="Architecture">
+    [Actor VM Overview](/architecture/actor-vm/overview)
+    
+    [Determinism & Sandboxing](/architecture/actor-vm/determinism-and-sandbox)
+  </Step>
+  
+  <Step title="Attack Vectors">
+    Study vulnerable patterns and congestion handling in the context of CIP-1 and CIP-3.
+  </Step>
+  
+  <Step title="Resource Limits">
+    Review determinism, metering, and limits (see CIP-3 and Actor VM sections).
+  </Step>
+  
+  <Step title="Gas Economics">
+    [Fee Model](/architecture/fees/overview)
+  </Step>
+  
+  <Step title="Consensus Security">
+    Review consensus mechanism and Byzantine fault tolerance assumptions.
+  </Step>
+  
+  <Step title="Off-Chain Security">
+    [Off-Chain Overview](/architecture/offchain/overview)
+    
+    Consider runner selection and collusion risks (see CIP-2).
+  </Step>
+</Steps>
+
+**Key Security Documents**:
+- [DoS Parameters](/architecture/scheduler/dos-parameters)
+- [Callback, Timeout & Challenge](/architecture/offchain/callback-timeout-challenge)
+
+---
+
+### Researcher / Academic
+
+**Goal**: Understand novel mechanisms and write papers
+
+**You should focus on**:
+1. Novel contributions
+2. Formal specifications
+3. Economic models
+4. Performance analysis
+
+**Recommended Path**:
+
+<Steps>
+  <Step title="High-Level Vision">
+    [What is Cowboy?](/introduction/what-is-cowboy)
+    
+    [Design Principles](/overview/design-principles)
+    
+    [Architecture Overview](/overview/architecture)
+  </Step>
+  
+  <Step title="Novel Mechanism 1: Dual-Metered Gas">
+    [Fee Model Overview](/architecture/fees/overview)
+    
+    [Dual EIP-1559](/architecture/fees/dual-eip1559)
+    
+    **Research angle**: Independent resource markets
+  </Step>
+  
+  <Step title="Novel Mechanism 2: Autonomous Scheduling">
+    [Scheduler Overview](/architecture/scheduler/overview)
+    
+    **Research angle**: Gas bidding for timers
+  </Step>
+  
+  <Step title="Novel Mechanism 3: Verifiable Off-Chain">
+    [Off-Chain Overview](/architecture/offchain/overview)
+    
+    **Research angle**: VRF-based task assignment
+  </Step>
+  
+  <Step title="Economics">
+    [Tokenomics](/economics/tokenomics)
+    
+    [Economic Flows](/economics/flows)
+  </Step>
+  
+  <Step title="Governance">
+    [CIP-12: Governance](/cips/cip-12-governance)
+
+    [Versioning Strategy](/versioning/strategy)
+  </Step>
+</Steps>
+
+**Core Specifications**:
+- Whitepaper and CIPs (see documentation)
+
+**Potential Research Topics**:
+- Dual-resource EIP-1559 dynamics
+- VRF-based task assignment fairness
+- Gas bidding agent strategies
+- Off-chain compute verification trade-offs
+
+---
+
+## By Experience Level
+
+### Blockchain Beginner
+
+**You're new to blockchain entirely**
+
+**Start here**:
+1. [What is Cowboy?](/introduction/what-is-cowboy)
+2. [Architecture Overview](/overview/architecture)
+3. [Quickstart Guide](/getting-started/quickstart)
+4. [FAQ](/getting-started/faq)
+
+**Then**:
+- [SDK Overview](/developers/sdk) and [Example Actors](/developers/examples)
+
+**Skip** (for now):
+- Deep architecture docs
+- Protocol specifications
+- Consensus mechanisms
+
+---
+
+### Python Developer (No Blockchain)
+
+**You know Python but not blockchain**
+
+**Your Advantages**:
+- ✅ Python syntax familiarity
+- ✅ Testing frameworks familiarity
+
+**New Concepts to Learn**:
+1. **Blockchain basics**: Blocks, transactions, consensus
+2. **Determinism**: Whitelisted modules, no JIT, strict UTF-8
+3. **Fees**: Dual-metered Cycles (compute) and Cells (data)
+4. **Immutability**: Code can't be changed after deploy
+
+**Recommended Path**:
+1. [What is Cowboy?](/introduction/what-is-cowboy)
+2. [Quickstart](/getting-started/quickstart)
+3. [Determinism & Sandboxing](/architecture/actor-vm/determinism-and-sandbox)
+4. [Fee Model](/architecture/fees/overview)
+
+**Key Insight**: Think of actors as Python classes that:
+- Persist state via provided storage APIs
+- Do not access filesystem/network directly
+- Consume metered resources (Cycles/Cells)
+- Are immutable after deployment
+
+---
+
+### Advanced / Protocol Level
+
+**You want to understand everything deeply**
+
+**Comprehensive Path**:
+
+<Steps>
+  <Step title="Foundation">
+    - [What is Cowboy?](/introduction/what-is-cowboy)
+    - [Design Principles](/overview/design-principles)
+    - [Architecture Overview](/overview/architecture)
+    - [Architecture Overview](/overview/architecture)
+  </Step>
+  
+  <Step title="Actor VM">
+    - [Actor VM Overview](/architecture/actor-vm/overview)
+    - [Determinism & Sandboxing](/architecture/actor-vm/determinism-and-sandbox)
+  </Step>
+  
+  <Step title="Fee System">
+    - [Fee Model Overview](/architecture/fees/overview)
+    - [Dual EIP-1559](/architecture/fees/dual-eip1559)
+    - CIP-3
+  </Step>
+  
+  <Step title="Scheduler">
+    - [Scheduler Overview](/architecture/scheduler/overview)
+    - CIP-1
+  </Step>
+  
+  <Step title="Off-Chain">
+    - [Off-Chain Overview](/architecture/offchain/overview)
+    - CIP-2
+  </Step>
+  
+  <Step title="Transactions">
+    - Idempotency
+    - Reentrancy
+  </Step>
+  
+  <Step title="Development">
+    - [SDK Overview](/developers/sdk)
+    - [Best Practices](/developers/best-practices)
+    - [Examples](/developers/examples)
+  </Step>
+</Steps>
+
+---
+
+## By Goal
+
+### "I want to build a DApp quickly"
+
+**Fast Track**:
+1. [Quickstart](/getting-started/quickstart)
+2. [SDK Overview](/developers/sdk)
+3. [Example Actors](/developers/examples)
+
+---
+
+### "I want to build production-grade contracts"
+
+**Quality Track**:
+1. [Quickstart](/getting-started/quickstart)
+2. [Best Practices](/developers/best-practices)
+3. [Resource Limits](/architecture/actor-vm/resource-limits)
+4. [Fee Model](/architecture/fees/overview)
+5. Testing (via `cowboy_sdk.mock_host`, hosted devnet, and optional local devnet)
+
+---
+
+### "I want to run infrastructure (validator/runner)"
+
+**Infrastructure Track**:
+1. [Architecture Overview](/overview/architecture)
+2. [Source Layout](/getting-started/repo-layout) — the `node/`, `runner/`, `cbfs/` trees in a full source workspace
+3. [Off-Chain Overview](/architecture/offchain/overview)
+4. Local validator and deployment tooling from the full source workspace
+
+---
+
+### "I want to contribute to Cowboy"
+
+**Contributor Track**:
+1. [Source Layout](/getting-started/repo-layout)
+2. [Contributing Guide](/contributing/how-to-propose)
+3. Writing rules and style guides
+4. Pick an area (core/SDK/docs)
+5. Start contributing
+
+---
+
+## Need Help Choosing?
+
+Still not sure where to start? Refer to the Overview section or CIPs for authoritative guidance.

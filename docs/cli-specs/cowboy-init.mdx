@@ -1,0 +1,124 @@
+---
+title: "cowboy init"
+description: Configure a Cowboy project and wallet for a network
+icon: folder-plus
+---
+
+## Synopsis
+
+```bash
+cowboy init <network> [--rpc-url <url>]
+```
+
+Where `<network>` is one of: `local`, `dev`, `summit`. Passing `summit` currently errors out with "Summit (mainnet) is not available yet" — included in the enum for forward compatibility.
+
+The optional `--rpc-url` flag overrides the default RPC URL for the network. This is useful when testing against a different validator instance or an ephemeral environment:
+
+```bash
+cowboy init dev --rpc-url https://my-staging-validator.example.com
+```
+
+## Behavior
+
+1. **Create project directory structure:**
+
+```
+.cowboy/
+  keys/
+    <network>        # secp256k1 private key (PEM format, 0600 perms)
+  config.json        # multi-environment config (see schema below)
+```
+
+`cowboy init` is safe to run multiple times — each run adds a new environment to `.cowboy/config.json` without overwriting keys. Starter actor scaffolding lives under `cowboy actor new <name>` and is not part of `init`.
+
+2. **Generate a wallet** — Calls the same logic as `cowboy wallet create` but targets `.cowboy/keys/<network>` instead of `.cowboy/key`. Each network gets its own key so you never accidentally sign a mainnet transaction with a local-only key.
+
+3. **Write / merge network config** — Reads any existing `.cowboy/config.json`, adds or updates the entry for `<network>`, and sets the active environment to the one just initialised. The new schema looks like:
+
+   ```json
+   {
+     "active": "dev",
+     "environments": {
+       "local": {
+         "rpc_url": "http://localhost:4000",
+         "key_file": "keys/local"
+       },
+       "dev": {
+         "rpc_url": "https://rpc.mesa.cowboylabs.net",
+         "key_file": "keys/dev",
+         "watchtower_registry": "0x7e69e92bCE7B0AEcAA4a18ce21F3665E12c47751"
+       }
+     }
+   }
+   ```
+
+   For `dev`, the CLI also writes the well-known `watchtower_registry` address so `cowboy watchtower` commands work without extra flags. Old flat-format configs (`{ "network": "...", "rpc_url": "..." }`) are migrated on first run.
+
+4. **Auto-discover network identity (optional)** — If a `test/peers.yaml` is present in the current directory or any ancestor, `cowboy init` extracts the BLS12-381 network identity and stores it as `environments.<network>.identity` so RAS / CBFS commands can verify chain artefacts without an extra flag.
+
+5. **Fund the wallet (if faucet available)** — For `local` and `dev`, sends `POST <rpc_url>/faucet` to fund the new wallet with CBY. Prints the funded amount and balance. If the faucet is unreachable, prints a warning and continues — the project is still usable.
+
+6. **Print summary** — Shows the created key path, config path, wallet address, and next steps.
+
+## Network Defaults
+
+| Network | Default RPC URL | Faucet |
+|---------|-----------------|--------|
+| `local` | `http://localhost:4000` | Yes — `POST http://localhost:4000/faucet` |
+| `dev`   | `https://rpc.mesa.cowboylabs.net` | Yes — `POST https://rpc.mesa.cowboylabs.net/faucet` |
+| `summit` | Not yet available (mainnet, TBD) | — |
+
+## Example
+
+```bash
+$ cowboy init local
+Creating Cowboy project...
+  Created .cowboy/keys/local
+  Created .cowboy/config.json (network: local, rpc: http://localhost:4000)
+
+Wallet address: 0x7a3b...f92e
+Requesting funds from faucet...
+  Funded: 1000 CBY
+  Balance: 1000 CBY
+
+Next steps:
+  cowboy actor new hello
+  cowboy actor deploy --code actors/hello/main.py
+```
+
+Running `cowboy init dev` next adds `dev` to the same config without touching `local`:
+
+```bash
+$ cowboy init dev
+Creating Cowboy project...
+  Created .cowboy/keys/dev
+  Discovered network identity from peers.yaml
+  Created .cowboy/config.json (network: dev, rpc: https://rpc.mesa.cowboylabs.net)
+
+Wallet address: 0x3f1c...aa29
+Requesting funds from faucet...
+  Funded: 1000 CBY
+  Balance: 1000 CBY
+```
+
+## Edge Cases
+
+- **Existing key for the same network** — If `.cowboy/keys/<network>` already exists, `cowboy init <network>` skips wallet generation and reuses the existing key. No overwrite ever happens.
+- **Faucet unreachable** — If the faucet request fails (network down, local validator not running), print a warning but continue. The project is still usable.
+- **Old flat config format** — If `.cowboy/config.json` uses the legacy `{ "network": "...", "rpc_url": "..." }` schema, `cowboy init` migrates it in place to the `environments` schema on the next run.
+- **`summit` network** — Rejected with a clear error message; reserved for the future mainnet launch.
+
+## Testing
+
+```bash
+# Test local init
+cowboy init local
+ls -la .cowboy/
+cat .cowboy/config.json
+
+# Verify wallet was created
+cowboy wallet address
+
+# Test idempotency (should warn, not overwrite)
+cowboy init local
+```

@@ -1,0 +1,44 @@
+---
+title: "E1207 — Missing entitlement"
+description: "Missing entitlement"
+---
+
+# E1207 — Missing entitlement
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1207` |
+| **Slug** | `E1207` |
+| **Category** | `entitlement` (Entitlement) |
+
+
+## What happened
+
+Missing entitlement.
+
+## Why it happened
+
+The actor attempted an operation (e.g., `set_state`, `send_message`) that requires an entitlement not declared in its manifest.
+
+## How to fix
+
+Declare the required entitlement in the actor's manifest and redeploy. For example, add `storage.kv` for state access or `messaging.send` for message sending.
+
+## Receipt example
+
+```json
+{
+  "code": 1207,
+  "slug": "E1207",
+  "category": "entitlement",
+  "what": "Missing entitlement",
+  "fix": "Declare the required entitlement in the actor's manifest and redeploy.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1207"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

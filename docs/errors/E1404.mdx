@@ -1,0 +1,44 @@
+---
+title: "E1404 — Insufficient token allowance"
+description: "Insufficient token allowance"
+---
+
+# E1404 — Insufficient token allowance
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1404` |
+| **Slug** | `E1404` |
+| **Category** | `token` (Token (CIP-20)) |
+| **CIP** | CIP-20 |
+
+## What happened
+
+Insufficient token allowance.
+
+## Why it happened
+
+The spender's allowance is less than the `transfer_from` amount.
+
+## How to fix
+
+Call `token_approve` to raise the allowance before calling `token_transfer_from`.
+
+## Receipt example
+
+```json
+{
+  "code": 1404,
+  "slug": "E1404",
+  "category": "token",
+  "what": "Insufficient token allowance",
+  "fix": "Call `token_approve` to raise the allowance before calling `token_transfer_from`.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1404"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

@@ -1,0 +1,29 @@
+{
+  "source": "https://modal.com/docs/guide/webhook-proxy-auth",
+  "vendor": "modal",
+  "capability": "invoke a deployed Modal web endpoint via proxy auth tokens",
+  "endpoint_host_suffix": ".modal.run",
+  "methods": ["GET", "POST"],
+  "auth": {
+    "in": "header",
+    "scheme": "modal-proxy-auth",
+    "key_header": "Modal-Key",
+    "secret_header": "Modal-Secret",
+    "key_secret": "MODAL_TOKEN_ID",
+    "secret_secret": "MODAL_TOKEN_SECRET",
+    "token_id_prefix": "wk-",
+    "token_secret_prefix": "ws-"
+  },
+  "idempotency": {"header": "Idempotency-Key", "vendor_dedup": false},
+  "wrapper_inputs": ["hire_id", "endpoint", "payload", "query"],
+  "not_wrapped": ["sandboxes", "deploy-then-invoke arbitrary code"],
+  "bounds": {
+    "max_endpoints": 16,
+    "max_label_chars": 64,
+    "max_url_chars": 512,
+    "max_query_params": 24,
+    "max_request_bytes": 32000,
+    "runner_result_bytes": 65536,
+    "result_bytes": 38000
+  }
+}

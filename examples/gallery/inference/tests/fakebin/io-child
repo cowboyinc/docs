@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+"""Misbehaving child for the pipe-pump tests; behavior from IO_CHILD."""
+import os, sys, time
+mode = os.environ["IO_CHILD"]
+if mode == "sleep-no-read":
+    time.sleep(5)          # never reads stdin, never exits in time
+elif mode == "stderr-first":
+    sys.stderr.write("e" * (256 * 1024)); sys.stderr.flush()
+    sys.stdout.write("{}"); sys.stdout.flush()
+elif mode == "big-stderr":
+    sys.stderr.write("e" * (2 * 1024 * 1024)); sys.stderr.flush()
+    sys.stdout.write("{}"); sys.stdout.flush(); sys.exit(1)
+elif mode == "echo":
+    data = sys.stdin.buffer.read(); sys.stdout.buffer.write(data)
+elif mode == "hang-after-output":
+    sys.stdout.write("{}"); sys.stdout.flush(); time.sleep(5)

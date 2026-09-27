@@ -1,0 +1,49 @@
+cowbot actor manifest (CIP-24 §5.5)
+===================================
+
+manifest.json declares the CIP-6 entitlements the deployed cowbot actor holds.
+It is encoded + embedded in the DeployActor tx via:
+
+    cowboy actor deploy cowbot --manifest-json manifest.json ...   (from this directory)
+
+Entitlements (array is sorted lexicographically by `id`, as the codec/validator
+expect): http.fetch, secrets.read, secrets.verify, storage.kv.
+
+  - http.fetch       outbound HTTP to slack.com only, capped at 16 requests.
+  - secrets.read     grants ${SLACK_BOT_TOKEN} substitution into outbound posts.
+  - secrets.verify   grants SLACK_SIGNING_SECRET as an inbound-MAC (`verify=`) key
+                     ONLY — it can never be substituted into a request (that is
+                     what stops the actor exfiltrating the signing secret).
+  - storage.kv       actor KV state (pending/requests/dedupe/dispatch counters).
+
+The two grants are DISJOINT on purpose: CIP-24 §5.5's overlap rule forbids the
+same {account, key} pair serving both the read and verify roles within one job,
+and the runner fail-closes a `verify=` MAC mismatch (JobPreconditionFailed)
+before any executor work or read-set release.
+
+OWNER_EOA SUBSTITUTION (required before deploy)
+-----------------------------------------------
+The `keys` entries use the cross-account form `<account>:<KEY_NAME>`. CBSS secrets
+are owned by the deployer EOA (actors have no wallet), so the grant must bind to
+the owner's address — the same account the actor names in its `secrets=` /
+`verify=` cross-account refs. deploy.sh MUST replace the literal `OWNER_EOA`
+placeholder with the deployer's address in LOWERCASE, NO `0x` prefix, e.g.:
+
+    OWNER_LC=$(printf '%s' "${COWBOT_OWNER_ADDR#0x}" | tr 'A-F' 'a-f')
+    sed "s/OWNER_EOA/${OWNER_LC}/g" manifest.json > manifest.deploy.json
+    cowboy actor deploy cowbot --manifest-json manifest.deploy.json ...   (from this directory)
+
+(`Address::from_hex` is case-insensitive, but lowercase-no-0x is the canonical
+form. The chain matches a release request's SecretId.account/key_hash against
+keccak256(account || key_name) for each `account:KEY` entry; a colon-less entry
+would bind to the ACTOR's own address, which is wrong here.)
+
+The two secrets themselves are set by the owner against the NEW actor address.
+`--rpc-url`/`--private-key` are flags on the `secrets` group (before `set`); the
+read ACL is `--actor` (singular, repeatable); the value is piped via `--value-file -`
+(stdin — the inline form is refused on a tty and would leak into shell history).
+deploy.sh Step 4c does this automatically from $COWBOT_SLACK_BOT_TOKEN /
+$COWBOT_SLACK_SIGNING_SECRET; the manual form is:
+
+    printf %s "<xoxb-…>"  | cowboy secrets --rpc-url <url> --private-key <owner-key> set SLACK_BOT_TOKEN      --value-file - --actor <actor-addr>
+    printf %s "<signing>" | cowboy secrets --rpc-url <url> --private-key <owner-key> set SLACK_SIGNING_SECRET --value-file - --actor <actor-addr>

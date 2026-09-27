@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Homestead CBFS architecture and Node blocker</title>
+  <style>
+    :root {
+      --ink: #191712;
+      --muted: #666056;
+      --paper: #f4efe5;
+      --card: #fffdf8;
+      --line: #d9d0c1;
+      --orange: #d85d2b;
+      --orange-soft: #f7dfd3;
+      --green: #147a58;
+      --green-soft: #dff1e9;
+      --blue: #246c9f;
+      --blue-soft: #dfedf7;
+      --purple: #6d54a3;
+      --purple-soft: #ece5f8;
+      --red: #a83b33;
+      --red-soft: #f7dfdc;
+      --shadow: 0 14px 40px rgba(52, 42, 27, .09);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 9% 3%, rgba(216, 93, 43, .14), transparent 25rem),
+        linear-gradient(180deg, #faf7f0 0, var(--paper) 36rem);
+      font: 16px/1.56 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: var(--blue); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    code { font-size: .91em; background: #eee8dd; border-radius: 5px; padding: .08rem .28rem; }
+    main { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 38px 0 88px; }
+    header {
+      position: relative;
+      overflow: hidden;
+      min-height: 400px;
+      padding: clamp(28px, 5vw, 64px);
+      border: 1px solid #d2c5b3;
+      border-radius: 28px;
+      background: #231f19;
+      color: #fffaf1;
+      box-shadow: var(--shadow);
+    }
+    header::after {
+      content: "";
+      position: absolute;
+      width: 420px; height: 420px;
+      right: -120px; top: -160px;
+      border: 70px solid rgba(216, 93, 43, .65);
+      border-radius: 50%;
+    }
+    .eyebrow { text-transform: uppercase; letter-spacing: .16em; font-weight: 800; font-size: .76rem; color: #f2aa82; }
+    h1 { max-width: 850px; margin: .5rem 0 1rem; font: 700 clamp(2.5rem, 7vw, 5.6rem)/.95 Georgia, serif; letter-spacing: -.055em; }
+    header p { max-width: 780px; color: #dfd5c5; font-size: clamp(1rem, 2vw, 1.25rem); }
+    .status { display: inline-flex; gap: .6rem; align-items: center; margin-top: 1.2rem; border: 1px solid #5f5649; border-radius: 99px; padding: .52rem .84rem; color: #f0e4d3; font-size: .85rem; }
+    .status i { width: 9px; height: 9px; background: #e58a54; border-radius: 50%; }
+    nav { display: flex; gap: 8px; overflow-x: auto; margin: 18px 0 42px; padding: 8px; position: sticky; top: 8px; z-index: 5; background: rgba(250,247,240,.9); backdrop-filter: blur(16px); border: 1px solid var(--line); border-radius: 14px; }
+    nav a { white-space: nowrap; text-decoration: none; color: #3f392f; font-weight: 700; font-size: .83rem; padding: .55rem .75rem; border-radius: 9px; }
+    nav a:hover { background: #eee5d8; }
+    section { margin-top: 56px; scroll-margin-top: 90px; }
+    h2 { margin: 0 0 .8rem; font: 700 clamp(1.8rem, 4vw, 3rem)/1.05 Georgia, serif; letter-spacing: -.035em; }
+    h3 { margin: 0 0 .45rem; font-size: 1.05rem; }
+    .lede { max-width: 820px; color: var(--muted); font-size: 1.06rem; margin-bottom: 24px; }
+    .callout { border-left: 5px solid var(--orange); background: var(--orange-soft); padding: 18px 22px; border-radius: 0 14px 14px 0; margin: 22px 0; }
+    .callout strong { display: block; margin-bottom: .3rem; }
+    .grid { display: grid; gap: 16px; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px; box-shadow: 0 6px 20px rgba(52,42,27,.045); }
+    .card p:last-child, .card ul:last-child { margin-bottom: 0; }
+    .bad { border-top: 5px solid var(--red); }
+    .good { border-top: 5px solid var(--green); }
+    .neutral { border-top: 5px solid var(--blue); }
+    .pill { display: inline-block; margin-bottom: 10px; padding: .22rem .58rem; border-radius: 99px; font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+    .pill.red { color: var(--red); background: var(--red-soft); }
+    .pill.green { color: var(--green); background: var(--green-soft); }
+    .pill.blue { color: var(--blue); background: var(--blue-soft); }
+    .pill.purple { color: var(--purple); background: var(--purple-soft); }
+    .metric { font: 700 2.35rem/1 Georgia, serif; letter-spacing: -.04em; }
+    .metric-label { color: var(--muted); font-size: .83rem; margin-top: .35rem; }
+    .architecture { display: grid; grid-template-columns: 1fr 50px 1fr 50px 1fr 50px 1fr; gap: 10px; align-items: stretch; margin-top: 24px; }
+    .layer { min-height: 210px; padding: 18px; border-radius: 18px; border: 1px solid; background: var(--card); }
+    .layer.client { border-color: #cbb9e7; background: #f8f4ff; }
+    .layer.service { border-color: #9fc7b6; background: #f0faf5; }
+    .layer.cbfs { border-color: #9ec5df; background: #f0f8fd; }
+    .layer.chain { border-color: #e4b297; background: #fff5ef; }
+    .arrow { display: grid; place-items: center; color: #817667; font-size: 1.8rem; }
+    .layer small { display: block; color: var(--muted); margin-top: .7rem; }
+    .layer ul { padding-left: 1.1rem; }
+    .flow { margin: 22px 0 34px; background: var(--card); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+    .flow-head { display: flex; gap: 14px; align-items: center; padding: 19px 22px; background: #29251f; color: white; }
+    .flow-num { flex: 0 0 auto; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--orange); font-weight: 900; }
+    .flow-head h3 { margin: 0; font-size: 1.18rem; }
+    .flow-sub { color: #cfc5b7; font-size: .85rem; }
+    .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .step { position: relative; padding: 22px 20px 24px; border-right: 1px solid var(--line); }
+    .step:last-child { border-right: 0; }
+    .step::after { content: "→"; position: absolute; right: -11px; top: 25px; z-index: 1; width: 21px; height: 21px; border: 1px solid var(--line); border-radius: 50%; background: var(--card); display: grid; place-items: center; color: #897d6d; font-size: .72rem; }
+    .step:last-child::after { display: none; }
+    .step-kicker { color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-size: .69rem; font-weight: 800; }
+    .step strong { display: block; margin: .45rem 0; }
+    .scale { display: flex; gap: 9px; align-items: flex-start; margin: 0; padding: 13px 18px; background: #f4efe7; border-top: 1px solid var(--line); color: #4d463c; font-size: .89rem; }
+    .scale b { color: var(--green); white-space: nowrap; }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: var(--card); }
+    th, td { text-align: left; vertical-align: top; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+    th { background: #2b2721; color: white; font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; }
+    tr:last-child td { border-bottom: 0; }
+    td:first-child { font-weight: 750; }
+    .yes { color: var(--red); font-weight: 800; }
+    .no { color: var(--green); font-weight: 800; }
+    .tree-compare { display: grid; grid-template-columns: 1fr 80px 1fr; gap: 18px; align-items: center; }
+    .tree-box { min-height: 260px; border: 1px solid var(--line); background: var(--card); border-radius: 18px; padding: 20px; }
+    .tree-row { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; margin: 8px 0; padding: 9px 11px; background: #f4efe7; border-radius: 10px; font-size: .83rem; }
+    .tree-row.hot { outline: 2px solid var(--orange); background: #fff1e8; }
+    .tree-row .hash { color: var(--muted); font-family: ui-monospace, monospace; }
+    .tree-arrow { text-align: center; font-size: 2rem; color: var(--orange); }
+    .invariants { counter-reset: item; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; padding: 0; list-style: none; }
+    .invariants li { counter-increment: item; position: relative; min-height: 84px; padding: 16px 16px 16px 54px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); }
+    .invariants li::before { content: counter(item); position: absolute; left: 15px; top: 15px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; color: white; background: var(--green); font-weight: 900; font-size: .8rem; }
+    .decision { display: grid; grid-template-columns: 180px 1fr; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+    .decision:last-child { border-bottom: 0; }
+    .decision dt { font-weight: 800; }
+    .decision dd { margin: 0; color: #4f493f; }
+    footer { margin-top: 64px; padding: 28px; border-radius: 18px; color: #dcd3c5; background: #27231d; }
+    footer code { background: #423b31; }
+    @media (max-width: 900px) {
+      .grid.two, .grid.three, .invariants { grid-template-columns: 1fr; }
+      .architecture { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); min-height: 30px; }
+      .steps { grid-template-columns: 1fr; }
+      .step { border-right: 0; border-bottom: 1px solid var(--line); }
+      .step::after { right: auto; left: 25px; top: auto; bottom: -11px; transform: rotate(90deg); }
+      .tree-compare { grid-template-columns: 1fr; }
+      .tree-arrow { transform: rotate(90deg); }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Homestead · implementation-grounded architecture · September 2026</div>
+    <h1>Homestead already stores its workspace in CBFS.</h1>
+    <p>This document records the shipped file-based service, shows each user operation, and captures the Node/RAS import failure that motivated the native shard-index branch. It proposes no Homestead or CBFS storage rewrite.</p>
+    <div class="status"><i></i> Approved architecture · Node implementation under validation</div>
+  </header>
+
+  <nav aria-label="Document sections">
+    <a href="#decision">Decision</a>
+    <a href="#current">Current files</a>
+    <a href="#flows">User flows</a>
+    <a href="#scans">Tree scans</a>
+    <a href="#blocker">Node blocker</a>
+    <a href="#node-fix">Node fix</a>
+    <a href="#scope">Approved scope</a>
+  </nav>
+
+  <section id="decision">
+    <h2>Decision</h2>
+    <p class="lede">Keep the shipped Homestead service registry and CBFS layout. Do not replace it with one metadata file per page. Do not add PoR, shard proofs, or storage-index logic to Homestead. Fix the volume-growth failure below the CBFS API in Node/RAS.</p>
+    <div class="grid three">
+      <article class="card good"><span class="pill green">Already shipped</span><div class="metric">Service registry</div><div class="metric-label">ordered operations, durable receipts, policy fencing, and SQLite projection</div></article>
+      <article class="card neutral"><span class="pill blue">Already shipped</span><div class="metric">CBFS files</div><div class="metric-label">registry journal, checkpoints, room snapshots, assets, and search data</div></article>
+      <article class="card bad"><span class="pill red">Observed baseline</span><div class="metric">Node/RAS</div><div class="metric-label">the import-failing path rewrote the complete shard inventory into one 64 KiB actor value</div></article>
+    </div>
+    <div class="callout"><strong>No Homestead storage build is authorized by this design.</strong>The earlier per-page <code>meta.json</code> proposal is withdrawn. It duplicated working registry behavior and omitted fields required for sessions, CAS, sharing, policy, and retry safety.</div>
+  </section>
+
+  <section id="current">
+    <h2>Current durable layout</h2>
+    <p class="lede">The persistent collaboration service is the single writer for its workspace volume. CBFS stores immutable registry history and room content; SQLite is rebuilt from that history.</p>
+    <div class="grid two">
+      <article class="card neutral">
+        <span class="pill blue">CBFS volume</span>
+        <pre class="mono" style="white-space:pre-wrap;line-height:1.8;margin:0">registry/v1/head.json
+registry/v1/segments/&lt;digest&gt;
+registry checkpoint objects and chunks
+rooms/&lt;page-id&gt;.ysnapshot
+assets/&lt;page-id&gt;/&lt;asset-id&gt;
+search/&lt;page-id&gt;.json
+service metadata and snapshot cursors</pre>
+        <p>Registry segments are append-only. A mutation publishes a new immutable segment and advances the small head; it does not rewrite a global page tree.</p>
+      </article>
+      <article class="card good">
+        <span class="pill green">Registry record</span>
+        <h3>Fields that must stay together</h3>
+        <ul>
+          <li>stable page ID, parent, title, icon, order, and trash/delete state;</li>
+          <li>revision used for compare-and-swap and route expectations;</li>
+          <li>ready routing assignment: stream ID, metadata version, and four authenticated lanes;</li>
+          <li>grants, public links, and effective page policy;</li>
+          <li>policy and membership generations needed for fresh authorization;</li>
+          <li>operation result and idempotency receipt for confirmed retries.</li>
+        </ul>
+        <p>These records are recovered from CBFS journal segments and signed checkpoints into <code>registry.sqlite</code>.</p>
+      </article>
+    </div>
+    <div class="architecture" role="img" aria-label="Current Homestead service and CBFS architecture">
+      <div class="layer client"><span class="pill purple">Clients</span><h3>Mac + web</h3><ul><li>CBQS/Yjs edits</li><li>typed registry operations</li><li>cursor-based listing</li></ul></div>
+      <div class="arrow">→</div>
+      <div class="layer service"><span class="pill green">Persistent service</span><h3>One writer</h3><ul><li>RegistryCommitWorker</li><li>room runtime</li><li>registry.sqlite</li><li>policy/session issuer</li></ul></div>
+      <div class="arrow">→</div>
+      <div class="layer cbfs"><span class="pill blue">Existing CBFS</span><h3>Durable files</h3><ul><li>journal + head</li><li>checkpoints</li><li>room snapshots</li><li>assets</li></ul></div>
+      <div class="arrow">→</div>
+      <div class="layer chain"><span class="pill red">Consensus</span><h3>Workspace authority</h3><ul><li>service delegation</li><li>membership/billing proof</li><li>CBFS volume root</li></ul><small>No per-page actor mutation in service mode.</small></div>
+    </div>
+  </section>
+
+  <section id="flows">
+    <h2>What happens for each user action</h2>
+
+    <article class="flow">
+      <div class="flow-head"><span class="flow-num">1</span><div><h3>Edit an existing document</h3><div class="flow-sub">Already implemented</div></div></div>
+      <div class="steps">
+        <div class="step"><span class="step-kicker">Editor</span><strong>Append CBQS/Yjs updates</strong>Collaborators converge through authenticated document lanes.</div>
+        <div class="step"><span class="step-kicker">Service</span><strong>Coalesce the latest generation</strong>The write-behind flusher keeps a dirty room retryable across an unlucky save.</div>
+        <div class="step"><span class="step-kicker">CBFS</span><strong>Replace one room file</strong><code>rooms/&lt;id&gt;.ysnapshot</code> is staged and committed through the shared volume writer.</div>
+        <div class="step"><span class="step-kicker">Search</span><strong>Update derived index</strong>The local/persisted search projection follows the durable snapshot.</div>
+      </div>
+      <p class="scale"><b>No page actor write:</b> ordinary body edits never modify the service registry or actor page state.</p>
+    </article>
+
+    <article class="flow">
+      <div class="flow-head"><span class="flow-num">2</span><div><h3>Create a new document</h3><div class="flow-sub">Already implemented through service operations</div></div></div>
+      <div class="steps">
+        <div class="step"><span class="step-kicker">Client</span><strong>Submit Create/BatchCreate</strong>The request carries an operation ID, expected registry revision, page fields, and parent relationship.</div>
+        <div class="step"><span class="step-kicker">Worker</span><strong>Authorize and allocate</strong>The ordered worker validates policy and prepares the complete routing assignment.</div>
+        <div class="step"><span class="step-kicker">CBFS</span><strong>Append a registry segment</strong>The segment contains the PageRecord and OperationResult; the small registry head advances.</div>
+        <div class="step"><span class="step-kicker">Client</span><strong>Sync the confirmed projection</strong>The service page listing exposes the new page only after confirmation.</div>
+      </div>
+      <p class="scale"><b>Imports:</b> up to 200 page creations share one typed batch operation and one durable result set.</p>
+    </article>
+
+    <article class="flow">
+      <div class="flow-head"><span class="flow-num">3</span><div><h3>Rename, icon, move, or reorder</h3><div class="flow-sub">Already implemented as registry operations</div></div></div>
+      <div class="steps">
+        <div class="step"><span class="step-kicker">Client</span><strong>Submit one typed mutation</strong>The expected registry revision protects against stale tree changes.</div>
+        <div class="step"><span class="step-kicker">Worker</span><strong>Validate permissions and graph</strong>The existing record keeps route and policy fields while changing only requested metadata.</div>
+        <div class="step"><span class="step-kicker">CBFS</span><strong>Append one immutable segment</strong>No room snapshot, asset, or descendant body is renamed or copied.</div>
+        <div class="step"><span class="step-kicker">Projection</span><strong>Advance SQLite transactionally</strong>Listing and session minting see the same confirmed revision.</div>
+      </div>
+      <p class="scale"><b>No tree rewrite:</b> the journal records a delta; checkpointing is periodic and independent.</p>
+    </article>
+
+    <article class="flow">
+      <div class="flow-head"><span class="flow-num">4</span><div><h3>Trash, restore, or permanently delete</h3><div class="flow-sub">Policy change plus durable receipt</div></div></div>
+      <div class="steps">
+        <div class="step"><span class="step-kicker">Worker</span><strong>Validate the affected subtree</strong>Deletion cannot silently cross a permission boundary.</div>
+        <div class="step"><span class="step-kicker">Fence</span><strong>Revoke retained routes</strong>Policy-reducing operations withhold confirmation until existing lane owners are fenced.</div>
+        <div class="step"><span class="step-kicker">CBFS</span><strong>Publish Complete + result</strong>Tombstones retain enough context for authorized changefeeds and recovery.</div>
+        <div class="step"><span class="step-kicker">Retry</span><strong>Return the same outcome</strong>OperationResult survives SQLite deletion because it is in the CBFS journal.</div>
+      </div>
+      <p class="scale"><b>Content lifecycle:</b> registry deletion controls access; room and asset retention/GC remains a separately bounded service concern.</p>
+    </article>
+  </section>
+
+  <section id="scans">
+    <h2>Tree scans and recovery</h2>
+    <table>
+      <thead><tr><th>Action</th><th>Source</th><th>Full scan?</th><th>Consensus per page?</th></tr></thead>
+      <tbody>
+        <tr><td>Normal tree refresh</td><td>Cursor-paged <code>registry.sqlite</code> projection</td><td class="no">No unbounded CBFS scan</td><td class="no">No</td></tr>
+        <tr><td>Single metadata mutation</td><td>Current record + immutable journal append</td><td class="no">No</td><td class="no">No</td></tr>
+        <tr><td>Service restart</td><td>Signed checkpoint plus retained journal suffix</td><td>Bounded replay</td><td class="no">No</td></tr>
+        <tr><td>Delete local SQLite</td><td>Rebuild from CBFS checkpoint, segments, and receipts</td><td class="yes">Recovery only</td><td class="no">No</td></tr>
+        <tr><td>Search startup reconciliation</td><td>Persisted room IDs and search entries</td><td class="yes">Recovery only</td><td class="no">No</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><strong>Current limit to preserve and address:</strong> cold service-admission lineage is limited to 4,096 commits beyond the cutover checkpoint. That is a checkpoint/recovery bound, not a page-count limit and not a reason to replace the registry format.</div>
+  </section>
+
+  <section id="blocker">
+    <h2>The import blocker that motivated the Node change</h2>
+    <p class="lede">Every service publication above was already an ordinary CBFS commit. The observed import failed after that boundary because the previous Node/RAS path rewrote a complete live-shard vector into one actor-storage value. The native shard-index branch removes that path.</p>
+    <div class="grid three">
+      <article class="card"><div class="metric">258</div><div class="metric-label">live shard entries at the observed failure</div></article>
+      <article class="card"><div class="metric">60,979 B</div><div class="metric-label">encoded one-value shard inventory at that point</div></article>
+      <article class="card bad"><div class="metric">82,267 B</div><div class="metric-label">projected 348-entry value, above 64 KiB</div></article>
+    </div>
+    <div class="grid two" style="margin-top:16px">
+      <article class="card bad"><span class="pill red">Do not change</span><h3>Homestead and CBFS</h3><p>No new page files, CBFS index, proof payload, or application-level shard structure. Existing service operations and immutable CBFS formats remain intact.</p></article>
+      <article class="card good"><span class="pill green">Branch fix</span><h3>Node consensus storage</h3><p>Open Node #1724 removes the one-value shard-inventory ceiling and the full-value rewrite from the RAS commit path. The manifest layout and write-relayer request schema remain unchanged. CBFS #265 has merged to <code>devnet</code> with a typed paged recovery reader and exact removal roots; its deployment must be coordinated with a Node build containing #1724.</p></article>
+    </div>
+    <p class="callout"><strong>PoR remains a Node responsibility.</strong> Node pins the selected native row when it issues a challenge and verifies the response against that snapshot. Homestead does not construct or transport PoR proofs.</p>
+  </section>
+
+  <section id="node-fix">
+    <h2>Node fix: a native keyed shard index</h2>
+    <p class="lede">Use the ordered, merkleized QMDB state that Node already commits in <code>BlockchainStorage::state_root</code>. The index lives in domain-separated <code>SystemState</code> rows, not Storage Manager actor KV. Each value is small, and every manifest commit touches O(delta) inventory rows: the named rows plus the moved tail row for a non-tail removal.</p>
+
+    <div class="grid three">
+      <article class="card neutral"><span class="pill blue">Primary row</span><h3>Find one live shard</h3><p>Logical key <code>"ras/inventory/v1/primary\0" || volume || shard || index</code> → chunk root, ciphertext size, ordinal, and the event sequence at which this incarnation was added.</p></article>
+      <article class="card neutral"><span class="pill blue">Ordinal row</span><h3>Select and enumerate</h3><p>Logical key <code>"ras/inventory/v1/ordinal\0" || volume || ordinal_be</code> → shard ID and shard index. The production store maps both logical-key forms through <code>StateKey::system_state</code>, whose physical key is <code>0x0A || Keccak256(logical_key) || zero padding</code>.</p></article>
+      <article class="card neutral"><span class="pill blue">Volume header</span><h3>Bound the live set</h3><p><code>StorageCommitment.live_shard_count</code> is the next append ordinal and the O(1) count used by PoR sampling and paged recovery reads.</p></article>
+    </div>
+
+    <div class="callout"><strong>One explicit limit replaces the accidental JSON limit.</strong><code>MAX_LIVE_SHARDS_PER_VOLUME = 1,048,576</code>. That supports roughly 174,000 six-shard files while bounding consensus-state growth and ordinal arithmetic. The current Homestead archive needs at most the low thousands, not millions. <code>MAX_COMMIT_FINALIZE_SHARDS = 65,536</code> still caps the combined added and removed references in one commit finalization.</div>
+
+    <article class="flow">
+      <div class="flow-head"><span class="flow-num">A</span><div><h3>Apply one manifest commit in O(delta)</h3><div class="flow-sub">No full inventory load, sort, hash, or rewrite</div></div></div>
+      <div class="steps">
+        <div class="step"><span class="step-kicker">Validate</span><strong>Point-read named keys</strong>Reject missing removals, duplicate additions, and removals whose root or size differs from the stored primary row. Every removal carries the real nonzero chunk root. Reject invalid additions and a count above the hard limit before changing state.</div>
+        <div class="step"><span class="step-kicker">Remove</span><strong>Swap-delete ordinals</strong>Move the last ordinal into a removed slot, update that shard's primary row, then delete the old last row and removed primary row.</div>
+        <div class="step"><span class="step-kicker">Add</span><strong>Append ordinals</strong>Write one primary row and one ordinal row per new shard, stamp the primary with this commit's event sequence, and advance <code>live_shard_count</code>.</div>
+        <div class="step"><span class="step-kicker">Commit</span><strong>Use the existing transaction boundary</strong>The inventory rows, volume commitment, event chunks, relay accounting, and manifest root succeed or roll back together.</div>
+      </div>
+      <p class="scale"><b>Cost:</b> O(added + removed) inventory reads and writes. Access-weight table version 15 reserves 2 point reads + 2 writes per addition, 4 + 4 for a worst-case non-tail removal, 1 + 1 per event page, and one fixed native revision read + write per commit, where pages = <code>ceil(added / 512) + ceil(removed / 512)</code>; direct and staged-finalize paths use the same split rows. State is authenticated by the existing global Node state root. Global QMDB finalization is benchmarked separately rather than assumed to be O(delta).</p>
+    </article>
+
+    <div class="grid two">
+      <article class="card neutral"><span class="pill blue">Storage API</span><h3>Narrow namespace, typed callers</h3><p><code>StateReader</code>/<code>StateWriter</code> expose <code>ras_inventory_get</code>, <code>ras_inventory_put</code>, and <code>ras_inventory_delete</code>. The production store accepts only logical keys under <code>ras/inventory/v1/</code> before mapping them into <code>SystemState</code>; execution builds and decodes primary and ordinal rows through typed helpers. Execution never receives arbitrary SystemState access.</p></article>
+      <article class="card neutral"><span class="pill blue">Atomicity proof</span><h3>Test the actual overlay</h3><p>A failing finalize must roll back primary rows, ordinal rows, <code>live_shard_count</code>, the volume commitment, and event/accounting writes together. A second test exercises speculative commit/revert so read-your-writes and state-root behavior are demonstrated, not inferred.</p></article>
+    </div>
+
+    <div class="callout"><strong>CIP-9 §5.6 and §11.1 amendment.</strong>Remove <code>StorageCommitment.shard_root</code> and its <code>[0;32]</code> “no anchor, do not slash” sentinel. Live membership and rank are committed by the native QMDB primary/ordinal rows plus <code>live_shard_count</code> under the global state root. Version 2 defines rank by dense ordinal (deterministic commit order plus swap-delete), replacing sorted-key rank while preserving uniform selection. Consensus selects a live row and pins that row's <code>chunk_root</code>, <code>shard_size</code>, and added-at sequence in the challenge. The response proves possession against those pinned values; it does not re-prove live membership. This sampling and serialization change is re-genesis-only on the disposable network.</div>
+
+    <article class="flow">
+      <div class="flow-head"><span class="flow-num">B</span><div><h3>Keep PoR native-row anchored</h3><div class="flow-sub">No new proof system or CBFS storage change</div></div></div>
+      <div class="steps">
+        <div class="step"><span class="step-kicker">Select</span><strong>Sample the global live set</strong>Both direct and bounded volume-directory builders exclude <code>GARBAGE_COLLECTING</code> commitments before drawing, even while their inventory rows remain for cleanup. The beacon selects one global ordinal, then Node reads that volume's ordinal and primary rows.</div>
+        <div class="step"><span class="step-kicker">Pin</span><strong>Snapshot row + incarnation</strong>The challenge records the selected shard's committed chunk root, ciphertext size, and added-at event sequence. The removed whole-volume root is no longer consulted.</div>
+        <div class="step"><span class="step-kicker">Respond</span><strong>Return a singleton view</strong>The challenge RPC returns the one pinned shard row. The write-relayer builds a chunk proof for the requested ciphertext range.</div>
+        <div class="step"><span class="step-kicker">Verify</span><strong>Check the pinned anchor</strong>The chunk proof must reach the pinned chunk root and size. Focused tests reject a wrong root or size, tampered bytes, a wrong chunk index, and incomplete range coverage.</div>
+      </div>
+      <p class="scale"><b>Security boundary:</b> membership is attested by consensus state, not by the response. The relay still proves possession of the selected ciphertext bytes. No full-volume map is copied into a challenge.</p>
+    </article>
+
+    <table>
+      <thead><tr><th>Removed full-map dependency</th><th>Native-row implementation</th></tr></thead>
+      <tbody>
+        <tr><td><code>build_por_universe</code></td><td>Read <code>live_shard_count</code> from each eligible volume commitment; count zero-row and <code>GARBAGE_COLLECTING</code> volumes as zero before the draw and retain cumulative global counts.</td></tr>
+        <tr><td><code>snapshot_por_target</code> + <code>advance_por_target_snapshot_bounded</code></td><td>Persist the bounded directory frontier using counts only, excluding <code>GARBAGE_COLLECTING</code> volumes before the draw. Do not persist a frozen beacon: the existing 10,000-key Storage Manager cap bounds binary search to 14 reads, so Node reserves the search and native-row resolution together and captures the concrete target in the same block.</td></tr>
+        <tr><td><code>resolve_por_target</code></td><td>Read one ordinal row and its primary row, returning shard ID, index, chunk root, size, and added-at sequence.</td></tr>
+        <tr><td>manual and timer issuance</td><td>Point-read the primary row, pin its row fields and incarnation, and skip a timer target deleted or replaced between parent snapshot and issuance.</td></tr>
+        <tr><td>response and expiry</td><td>Response verification remains against the pinned native-row values. At expiry, point-read the primary incarnation and terminal volume status. If the shard incarnation changed or the volume entered <code>GARBAGE_COLLECTING</code>, take the void path even while a native row remains: full bond refund, release the open slot, delete challenge state, emit <code>ras.por.challenge_voided</code>, and charge no fee/miss/slash/bounty. Reversible <code>DELETED</code> status does not void the challenge.</td></tr>
+        <tr><td>challenge detail RPC</td><td>Return the pinned shard as a singleton map; stop writing <code>por-challenge-shard-map</code>.</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><strong>Challenge-window rule from CIP-9 §5.6.</strong>If the challenged shard is removed by a commit or the volume becomes <code>GARBAGE_COLLECTING</code> before an unanswered challenge settles, expiry voids it with full bond refund and no miss, fee, slash, or bounty. This holds while bounded cleanup still retains the native row. Re-adding the same key cannot hide removal because its added-at sequence changes. Required regressions cover issue → remove → expire, issue → remove → re-add → expire, issue → respond → remove, and issue → terminal GC → expire with the row still present.</div>
+
+    <div class="grid two">
+      <article class="card good"><span class="pill green">Recovery API</span><h3>Paged reader and removal roots</h3><p>Open Node #1724 adds <code>GET /ras/chain/volumes/&lt;id&gt;/shards?after=&amp;limit=&amp;head_seq=</code>. <code>after</code> is an exclusive ordinal; <code>limit</code> is clamped to 1–1,024. Each page returns entries, <code>next_after</code>, <code>live_shard_count</code>, <code>current_head_seq</code>, and the current manifest root. For this endpoint <code>head_seq</code> is an opaque inventory revision. Later pages require the first page's revision and return conflict after a manifest commit or GC row drain; the event API's sequence is separate. CBFS #265 has merged to <code>devnet</code>: <code>volume_events.rs::read_chain_shards</code> consumes these pages and restarts on conflict, while the SDK supplies exact nonzero roots for removed manifest-node and object shards. The earlier CBFS baseline emitted zero removal roots. A strict test of the merged CBFS callers against Node #1724, Node merge, coordinated deployment, and live import/restart proof remain rollout gates. Do not deploy the new CBFS reader against a Node without the paged route: recovery fails closed when it cannot establish the inventory. CBFS storage formats and the relay upload path remain intact.</p></article>
+      <article class="card good"><span class="pill green">Cleanup</span><h3>No orphaned native rows</h3><p>Normal removes delete their two rows immediately. After acknowledged event history is pruned, an independent bounded per-block GC lane rotates fairly among terminal volumes. Each item pops one last ordinal, deletes its primary row, decrements <code>live_shard_count</code>, and advances the inventory revision. A durable consensus cursor resumes after restart, while later rent epochs continue without duplicate settlement. The commitment remains while rows exist; the volume leaves the live index only after the count reaches zero. Terminal relay purge may precede native-row cleanup; nonterminal inventory rows still protect committed shards. The separate 1,024-event-per-epoch pruning cap remains a general CIP-10 liveness gap. A proposed follow-up needs a durable, fair per-block event-prune queue and deterministic admission backpressure on outstanding prune work: valid commits can create more work than the current sweep's shared 32-item-per-block ceiling. Stage ingress must reserve prune capacity so accepted staged commits are not blocked at finalize solely by prune saturation, and clients need automatic retry for temporary admission refusals. Permanently lost event-time relays need a separate safe ACK recovery or retirement path: eviction, assignment rotation, and terminal status do not clear the current signed-ACK prune gate. None of those follow-up behaviors is supplied by this native-inventory change, so this change alone does not establish indefinite production readiness.</p></article>
+    </div>
+  </section>
+
+  <section id="scope">
+    <h2>Approved build scope</h2>
+    <div class="grid two">
+      <article class="card good"><span class="pill green">Build</span><ul><li>domain-separated native SystemState inventory helpers in Node storage;</li><li>delta-only RAS commit validation and swap-delete/appends;</li><li>native-row-anchored challenge issue/read/verification using the existing response wire;</li><li>an independent bounded per-block native GC lane;</li><li>a paged Node inventory endpoint, the CBFS recovery reader, and real CBFS SDK removal roots;</li><li>focused transition, deletion, rollback, speculative execution, restart, PoR, pagination, 10,000-shard, and pending-108-ref tests;</li><li>a fresh disposable Homestead chain and workspace, followed by a clean archive import.</li></ul></article>
+      <article class="card bad"><span class="pill red">Do not build</span><ul><li>per-page <code>meta.json</code> files;</li><li>a second Homestead registry or writer;</li><li>Homestead-side shard trees or proofs;</li><li>CBFS storage or relay-upload redesign;</li><li>a larger general actor-value cap;</li><li>a replacement for the service registry.</li></ul></article>
+    </div>
+    <h3 style="margin-top:30px">Implementation map</h3>
+    <table>
+      <thead><tr><th>Area</th><th>Focused change</th></tr></thead>
+      <tbody>
+        <tr><td>Node storage</td><td><code>storage/src/traits.rs</code> and <code>blockchain_storage.rs</code>: namespace-scoped <code>ras_inventory_get</code>/<code>put</code>/<code>delete</code> methods backed by <code>SystemState</code>, including overlay, savepoint, and speculative implementations; <code>execution/src/ras.rs</code> owns typed primary/ordinal helpers.</td></tr>
+        <tr><td>RAS types</td><td><code>ras/src/types.rs</code> and <code>por.rs</code>: replace commitment root with count; pin chunk root, size, and incarnation on a challenge; keep <code>PorResponse</code> wire unchanged.</td></tr>
+        <tr><td>RAS execution</td><td><code>execution/src/ras.rs</code> and <code>execution/src/execution/epoch_sweep.rs</code>: point validation, swap-delete/append, count-only directory building with terminal-volume exclusion, ordinal resolution, singleton challenge views, void-on-removal expiry, and independent bounded terminal drain. Access-weight table version 15 prices additions at 2R/2W, worst-case removals at 4R/4W, event pages at 1R/1W, and one fixed native revision read/write per commit; keep the executable reservations and state/access goldens aligned.</td></tr>
+        <tr><td>Node RPC</td><td><code>rpc/src/routes.rs</code> and <code>handlers/ras.rs</code>: typed public shard pages with a head-sequence consistency token.</td></tr>
+        <tr><td>CBFS node</td><td>Merged CBFS #265, <code>node/src/volume_events.rs::read_chain_shards</code>: consumes pages and restarts on conflict while preserving the durable reconcile mark, prune-horizon cursor, and retained-event replay.</td></tr>
+        <tr><td>CBFS SDK</td><td>Merged CBFS #265, <code>sdk/src/commit.rs</code>: supplies exact nonzero roots for removed manifest-node and object shards. Verify both removal callers against open Node #1724's strict primary-row validation before deployment.</td></tr>
+      </tbody>
+    </table>
+    <h3 style="margin-top:30px">Acceptance gates</h3>
+    <ol class="invariants">
+      <li>Existing service-registry and room-snapshot tests remain unchanged and green.</li>
+      <li>CBFS uses the same commit request schema and fields; removed shard references carry the exact nonzero root and size accepted by Node.</li>
+      <li>A one-shard delta against a 10,000-shard volume touches a constant number of inventory rows and no single value contains the complete inventory.</li>
+      <li>Removal validation through the CBFS caller seam, swap-delete integrity, zero-count and terminal-volume PoR exclusion in both samplers, relay byte accounting, volume events, fair per-block terminal cleanup beyond one epoch, crash resume, rent progress without duplicate settlement, paged pruned-cursor recovery, challenge-removal orderings, and native-row-anchored PoR have explicit passing coverage.</li>
+      <li>The pending 108-ref commit and complete archive import finish without an actor-value-limit error.</li>
+      <li>After the clean import, the service restarts from its CBFS journal/checkpoint and rerunning the importer creates no duplicate pages or assets.</li>
+    </ol>
+    <h3 style="margin-top:30px">Disposable rollout after the tests pass</h3>
+    <ol>
+      <li>Verify open Node #1724 against <code>devnet</code> CBFS with merged #265, including the strict removal-root caller seam and paged recovery; merge Node only after these checks pass.</li>
+      <li>Build and deploy compatible Node and CBFS versions on <code>dev-01</code>. Keep the write-relayer, relay upload path, and relay image intact.</li>
+      <li>Re-genesis <code>sitch-cb</code> with the existing <code>genesis.json</code> identity, deploy the validator, and redeploy host generation 9 against the same relay image.</li>
+      <li>Clear the disposable pending diff and registry state, create a fresh workspace, and import the archive from the beginning.</li>
+    </ol>
+  </section>
+
+  <footer><strong>Reviewed implementation anchors</strong><br>Homestead: <code>services/collab-relay/src/registry/</code>, <code>services/collab-relay/src/cbfs_store.rs</code>, <code>ServicePageMutations.swift</code>, and <code>ServiceWorkspaceSync.swift</code>. Node: <code>execution/src/ras.rs</code>, <code>execution/src/execution/epoch_sweep.rs</code>, <code>storage/src/traits.rs</code>, <code>storage/src/blockchain_storage.rs</code>, <code>rpc/src/handlers/ras.rs</code>, and <code>ras-write-relayer/src/main.rs</code>. CBFS: <code>node/src/volume_events.rs::read_chain_shards</code> and <code>sdk/src/commit.rs</code>. The prior greenfield per-page-file design is withdrawn.</footer>
+</main>
+</body>
+</html>

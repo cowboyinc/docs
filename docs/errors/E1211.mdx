@@ -1,0 +1,44 @@
+---
+title: "E1211 — Caller is not authorized"
+description: "Caller is not authorized"
+---
+
+# E1211 — Caller is not authorized
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1211` |
+| **Slug** | `E1211` |
+| **Category** | `validation` (Validation) |
+
+
+## What happened
+
+Caller is not authorized.
+
+## Why it happened
+
+The calling account does not have the authority to invoke this operation.
+
+## How to fix
+
+Only the designated authority (e.g., actor owner, governance council) may invoke this operation.
+
+## Receipt example
+
+```json
+{
+  "code": 1211,
+  "slug": "E1211",
+  "category": "validation",
+  "what": "Caller is not authorized",
+  "fix": "Only the designated authority (e.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1211"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

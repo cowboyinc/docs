@@ -1,0 +1,51 @@
+# Cowboy Gateway config for jefferson devnet (cowbot demo).
+#
+# This file is consumed by the gateway binary. The companion
+# bootstrap script `bootstrap-gateway.sh` writes it into place at
+# /opt/cowboy-gateway/gateway.toml when the systemd unit installs.
+#
+# Layout assumptions:
+#   - Validator running locally on 127.0.0.1:4002 (env-bootstrap.sh devnet)
+#   - Gateway keypair lives at /var/lib/cowboy-gateway/keypair.json
+#   - Tailscale Funnel forwards 443 → 127.0.0.1:8080 in front of this
+
+[server]
+# Loopback only — Tailscale Funnel is the public-facing TLS terminator.
+bind = "127.0.0.1:8080"
+
+[chain]
+rpc_url = "http://127.0.0.1:4002"
+poll_interval_blocks = 6
+
+[gateway]
+# secp256k1 private key the gateway uses to sign ExecuteActor txs for
+# `submit` and `submit_no_wait` routes. Provisioned by
+# `bootstrap-gateway.sh`; must be funded with CBY (it pays gas for every
+# state-mutating request that lands at an actor).
+keypair_path = "/var/lib/cowboy-gateway/keypair.json"
+
+[relays]
+# CBFS relay endpoints — empty for devnet (the gateway will fall back to
+# the chain RPC for any volume-blob fetches via `storage_fallback`).
+endpoints = []
+
+[cache]
+max_actors = 1024
+routes_ttl_secs = 300
+
+[resolution]
+# "both" enables BOTH host-header and path-prefix addressing. We use the
+# path form on devnet (https://<funnel>/0x<actor>/slack/events) which
+# requires zero per-actor config — Slack just points at the URL with
+# cowbot's address embedded in the path. host_to_actor is left empty for
+# this deployment; populate it when we want a friendlier hostname.
+mode = "both"
+
+[resolution.host_to_actor]
+# "bot.cowboy.lat" = "0x<cowbot_actor_address>"
+
+[compat]
+storage_fallback = true
+
+[mock]
+enabled = false

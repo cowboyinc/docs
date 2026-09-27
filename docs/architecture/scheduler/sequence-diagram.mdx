@@ -1,0 +1,53 @@
+---
+title: "Sequence Diagram"
+description: "Sequence diagram of scheduler workflow"
+---
+
+# Sequence Diagram
+
+The scheduler workflow is illustrated as follows...
+
+<Tip>
+  The sequence below is conceptual and illustrative (non-normative). Final interfaces are defined by the SDK and normative CIPs; do not treat this diagram as a fixed API.
+</Tip>
+
+## End-to-End Sequence (Conceptual)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant A as "Actor"
+    participant Q as "Scheduler"
+    participant G as "GBA"
+    participant P as "Producer"
+    participant V as "Actor VM"
+
+    A->>Q: set_timeout(...)
+    Note right of Q: Enqueue into tiered queues
+
+    P->>Q: Fetch due timers (block H)
+    Q-->>P: Timers
+
+    P->>G: getGasBid(context) for each timer
+    G-->>P: Bid params
+    P->>P: Order by effective tip
+    P->>V: Execute within per-block budget
+    alt Remaining timers
+        P->>Q: Rollover to next block
+    end
+```
+
+## What Happens At A Glance
+
+- Actors schedule timers via `set_timeout(...)`; the scheduler enqueues them in tiered queues.
+- At each block, the producer fetches due timers and queries each timer’s GBA for a bid (read-only context).
+- Timers are ordered by effective priority (tip-based) and executed within a fixed per-block budget.
+- Unexecuted timers automatically roll over to the next block.
+- Fee metering and dynamics follow CIP-3 (dual metering, basefee burn, proposer tip).
+
+## Further Reading
+
+- [Scheduler Overview](/architecture/scheduler/overview)
+- [DoS Protection Parameters](/architecture/scheduler/dos-parameters)
+- [Overview: Architecture](/overview/architecture)
+

@@ -1,0 +1,44 @@
+---
+title: "E1612 — TEE required for deterministic mode"
+description: "TEE required for deterministic mode"
+---
+
+# E1612 — TEE required for deterministic mode
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1612` |
+| **Slug** | `E1612` |
+| **Category** | `runner` (Runner / Consensus) |
+| **CIP** | CIP-2 §9 |
+
+## What happened
+
+TEE required for deterministic mode.
+
+## Why it happened
+
+Deterministic verification mode requires TEE but `tee_required` is not set.
+
+## How to fix
+
+Set `tee_required=true` on the job specification.
+
+## Receipt example
+
+```json
+{
+  "code": 1612,
+  "slug": "E1612",
+  "category": "runner",
+  "what": "TEE required for deterministic mode",
+  "fix": "Set `tee_required=true` on the job specification.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1612"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

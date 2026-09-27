@@ -1,0 +1,44 @@
+---
+title: "E1224 — Referenced message id does not exist"
+description: "Referenced message id does not exist"
+---
+
+# E1224 — Referenced message id does not exist
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1224` |
+| **Slug** | `E1224` |
+| **Category** | `runtime` (Runtime) |
+
+
+## What happened
+
+Referenced message id does not exist.
+
+## Why it happened
+
+The message id looked up has not been delivered or has already been consumed.
+
+## How to fix
+
+Verify the message id. It may have been consumed or never delivered.
+
+## Receipt example
+
+```json
+{
+  "code": 1224,
+  "slug": "E1224",
+  "category": "runtime",
+  "what": "Referenced message id does not exist",
+  "fix": "Verify the message id.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1224"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

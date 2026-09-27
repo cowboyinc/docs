@@ -1,0 +1,94 @@
+---
+title: "DoS Protection Parameters"
+description: "Parameter configuration to prevent denial-of-service attacks"
+---
+
+# DoS Protection Parameters
+
+The scheduler prevents DoS attacks through the following parameters...
+
+<Tip>
+  Parameters and examples on this page are conceptual and illustrative (non-normative). Final values and interfaces are defined by governance, SDK, and normative CIPs.
+</Tip>
+
+## Threat Model (Summary)
+
+Actors and external users can attempt to overload timer processing by:
+
+- Submitting a large volume of timers targeting the same block window
+- Attempting to monopolize execution time with long-running handlers
+- Spamming low-bid timers to force protocol work without meaningful payment
+- Scheduling extremely distant timers to bloat long-horizon state
+
+Cowboy mitigates these vectors with strict per-block resource budgets, price-based prioritization, and hierarchical queues with bounded maintenance costs.
+
+## Protocol-Level Limits (Hard Bounds)
+
+- Fixed per-block budget for timers (Cycles): a hard cap on compute used by timer-triggered messages within a block. This guarantees space for regular transactions and bounds block time (CIP‑1).
+- Deterministic metering (Cycles/Cells): all timer executions are metered under the dual-fee model. See Fees for basefee dynamics (CIP‑3).
+- Best-effort delivery: unexecuted timers are rolled to the next block; no unbounded retries within a single block.
+
+Governance/tunable parameters (conceptual):
+- Per-block timer budget (Cycles)
+- Ring buffer size (near-term blocks)
+- Epoch size (blocks per epoch)
+- Overflow migration horizon (epochs)
+- Reference: set/cancel timer has a representative cost of 200 cycles per CIP‑3
+
+## Economic Prioritization (Auction Within the Budget)
+
+When timers are due at height H:
+
+1. For each timer, the block producer performs a read-only call to the owner’s Gas Bidding Agent (GBA): `getGasBid(context)`.
+2. The returned bid is transformed into an effective tip for ordering. For Cycles, CIP‑1/CIP‑3 imply:
+
+```text
+effective_tip = min(
+  bid.tip_per_cycle,
+  bid.max_fee_per_cycle - basefee_cycle
+)
+```
+
+3. Timers are executed from highest to lowest effective tip until the budget is exhausted or the queue empties.
+4. Remaining timers roll over to the next block’s bucket.
+
+Properties:
+
+- Bounded work: execution is capped per block, preventing starvation of regular transactions
+- Market-based ordering: low-priority (low-bid) timers are priced out during congestion
+- Liveness: rollover preserves eventual execution (given sufficient balance)
+
+## Hierarchical Queues (Bounded Maintenance)
+
+- Layer 1 — Block Ring Buffer: O(1) enqueue/dequeue for near-term timers with governance-defined number of buckets.
+- Layer 2 — Epoch Queue: amortized redistribution at epoch boundaries from epoch buckets into the ring buffer.
+- Layer 3 — Overflow Sorted Set: Merkleized balanced BST for long-horizon timers; during epoch maintenance, timers entering the migration horizon move into the Epoch Queue.
+
+Epoch maintenance (conceptual):
+- Promote the current epoch bucket into the ring buffer (distribute timers to ring slots)
+- Migrate from the overflow set any timers that now fall within the migration horizon into their epoch buckets
+- All maintenance work is bounded/amortized per CIP‑1
+
+## Balance and Execution Preconditions
+
+- Execution charges are deducted at execution time based on the GBA’s bid and metered resource usage.
+- If the owner actor’s balance is insufficient to cover the bid, the timer execution fails for that block and is deferred to the next block.
+- GBA calls are read-only and use a protocol-supplied context (heights, basefees, congestion indicator, owner balance), ensuring deterministic inputs for bidding.
+
+## Optional Tie-Breaking and Smoothing (CIP-1)
+
+Implementations MAY maintain deterministic tie-breaking rules (e.g., per-actor priority weights updated each epoch from outcomes such as effective tip, success/delay, deadline delay, and budget share). Any scheme MUST be deterministic, governance-defined, and clamped within bounds to avoid long-term lock-in.
+
+## Invariants and Guarantees
+
+- Fixed upper bound on timer processing per block
+- Deterministic ordering within a block (by effective tip, with deterministic tie-breaks)
+- Amortized and bounded queue maintenance at epoch boundaries
+- Eventual execution (best-effort) subject to sufficient funds
+
+## Further Reading
+
+- [Scheduler Overview](/architecture/scheduler/overview)
+- [Sequence Diagram](/architecture/scheduler/sequence-diagram)
+- [Fees: Dual EIP-1559](/architecture/fees/dual-eip1559)
+

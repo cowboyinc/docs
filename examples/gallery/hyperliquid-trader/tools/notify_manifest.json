@@ -1,0 +1,7 @@
+{ "name": "hl-notify", "version": "0.1.0",
+  "entitlements": [
+    { "id": "http.fetch" },
+    { "id": "secrets.read", "params": { "keys": ["0x51E462a7cFD2e3E6D0318bC35245D5Bed5468983:TELEGRAM_BOT_TOKEN"] } },
+    { "id": "storage.kv" },
+    { "id": "timer.schedule" }
+  ] }

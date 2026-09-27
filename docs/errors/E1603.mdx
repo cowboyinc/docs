@@ -1,0 +1,44 @@
+---
+title: "E1603 — Insufficient stake"
+description: "Insufficient stake"
+---
+
+# E1603 — Insufficient stake
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1603` |
+| **Slug** | `E1603` |
+| **Category** | `runner` (Runner / Consensus) |
+| **CIP** | CIP-2 |
+
+## What happened
+
+Insufficient stake.
+
+## Why it happened
+
+The runner's staked amount is below the minimum required for the operation.
+
+## How to fix
+
+Top up the runner's stake to at least `MIN_STAKE × 1.5` per active job.
+
+## Receipt example
+
+```json
+{
+  "code": 1603,
+  "slug": "E1603",
+  "category": "runner",
+  "what": "Insufficient stake",
+  "fix": "Top up the runner's stake to at least `MIN_STAKE × 1.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1603"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

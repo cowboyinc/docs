@@ -1,0 +1,44 @@
+---
+title: "E1205 — Operation forbidden"
+description: "Operation forbidden"
+---
+
+# E1205 — Operation forbidden
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1205` |
+| **Slug** | `E1205` |
+| **Category** | `runtime` (Runtime) |
+
+
+## What happened
+
+Operation forbidden.
+
+## Why it happened
+
+The operation is disallowed in this context. Common triggers: synchronous call depth exceeding 32, reentrant call detected, or side-effect in a `@pure` handler.
+
+## How to fix
+
+Restructure the call graph — flatten the call chain, use asynchronous messages instead of deep sync calls, or move side-effects out of `@pure` handlers.
+
+## Receipt example
+
+```json
+{
+  "code": 1205,
+  "slug": "E1205",
+  "category": "runtime",
+  "what": "Operation forbidden",
+  "fix": "Restructure the call graph — flatten the call chain, use asynchronous messages instead of deep sync calls, or move side-effects out of `@pure` handlers.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1205"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

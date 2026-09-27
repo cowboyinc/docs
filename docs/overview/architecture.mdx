@@ -1,0 +1,466 @@
+---
+title: Architecture Overview
+description: High-level architecture of the Cowboy protocol
+icon: instalod
+---
+
+## Introduction
+
+Cowboy is a **Layer 1 blockchain** designed from the ground up for **autonomous agents** and **verifiable off-chain computation**. This document provides a high-level overview of the system architecture.
+
+<Tip>
+  **TL;DR**: Cowboy combines a Python-based Actor VM (PVM), dual-metered gas, native timers, verifiable off-chain compute (LLM/HTTP/MCP runners), and encrypted distributed storage (CBFS) into a cohesive protocol for agentic applications.
+</Tip>
+
+> Note: API names in diagrams and examples reflect the real `pvm_host` and `cowboy_sdk` surface. See the [SDK Overview](/developers/sdk) and CIP specifications for authoritative behavior.
+
+## System Architecture
+
+<img
+  src="/images/architecture_overview.png"
+/>
+
+## Core Components
+
+### 1. Actor VM (Python Runtime)
+
+**Purpose**: Execute actor (smart contract) code deterministically
+
+**Key Features**:
+- Python bytecode interpreter (no JIT)
+- Deterministic execution (no system calls, software FPU)
+- Dual-metered gas (Cycles for compute, Cells for data)
+- Sandboxed environment (no I/O, no network)
+
+**Architecture**:
+```
++------------------------------------------------------------+
+|                   PVM (Rust-based Python VM)               |
+|                                                            |
+|  +------------------------------------------------------+  |
+|  |              Python Bytecode Interpreter             |  |
+|  |  - Instruction dispatch                              |  |
+|  |  - Stack management                                  |  |
+|  |  - Fuel (cycles) metering                            |  |
+|  |  - Checkpoint / resume                               |  |
+|  +------------------------------------------------------+  |
+|                                                            |
+|  +------------------------------------------------------+  |
+|  |           pvm_host (low-level) / cowboy_sdk          |  |
+|  |  - get_state / set_state                             |  |
+|  |  - send (async actor-to-actor messages)              |  |
+|  |  - timer scheduling (CIP-1)                          |  |
+|  |  - runner.llm / runner.http / runner.mcp (CIP-2)     |  |
+|  |  - CBFS volume attach                                |  |
+|  +------------------------------------------------------+  |
+|                                                            |
+|  +------------------------------------------------------+  |
+|  |                  Determinism Layer                   |  |
+|  |  - Software floating-point (SoftFloat)               |  |
+|  |  - Curated stdlib whitelist                          |  |
+|  |  - No JIT compilation                                |  |
+|  +------------------------------------------------------+  |
++------------------------------------------------------------+
+
+```
+
+The CIP-6 SDK (`cowboy_sdk`) sits on top of `pvm_host`, providing an `@actor` decorator, CBOR auto-serialization, and a continuation FSM for async runner calls.
+
+**See**: [Actor VM Overview](/architecture/actor-vm/overview) · [SDK Overview](/developers/sdk)
+
+### 2. Consensus Layer (Simplex BFT)
+
+**Purpose**: Achieve agreement on block ordering and finality
+
+**Key Features**:
+- Byzantine Fault Tolerant (BFT)
+- Deterministic finality (no reorgs)
+- Leader-based block proposal
+- Quorum certificates (QC) for votes
+
+**Flow**:
+```
+Block Proposal Flow:
+1. Leader proposes block
+2. Validators validate:
+   |-- Transactions valid?
+   |-- State transition correct?
+   \-- Gas limits respected?
+3. Validators vote (signature)
+4. QC formed (2/3+ votes)
+5. Block finalized
+6. Next leader elected
+```
+
+**Properties**:
+- **Safety**: No forks (deterministic finality)
+- **Liveness**: Progress guaranteed with 2/3+ honest validators
+ 
+
+### 3. Dual-Metered Gas System
+
+**Purpose**: Fair resource pricing for compute and data
+
+**Architecture**:
+```
+Transaction Execution
+|
+|-- Compute Operations
+|   |-- Bytecode execution      -> Charged in Cycles
+|   |-- Function calls          -> Charged in Cycles
+|   \-- Hash computations       -> Charged in Cycles
+|
+\-- Data Operations
+    |-- Transaction payload     -> Charged in Cells
+    |-- Storage writes          -> Charged in Cells
+    \-- Return data             -> Charged in Cells
+```
+
+**Independent Fee Markets**:
+- Each resource has its own basefee
+- Basefees adjust independently (dual EIP-1559)
+- Prevents cross-subsidization
+
+**See**: [Fee Model](/architecture/fees/overview)
+
+### 4. Timer Scheduler (CIP-1)
+
+**Purpose**: Native timer scheduling with autonomous execution
+
+**Architecture**:
+```
++------------------------------------------------------------+
+|                    Hierarchical Calendar Queue             |
+|                                                            |
+|  +------------------------------------------------------+  |
+|  | Layer 1: Block Ring Buffer                           |  |
+|  | [B+0][B+1][B+2]...[B+255]                            |  |
+|  | O(1) access for near-term timers                     |  |
+|  +------------------------------------------------------+  |
+|                                                            |
+|  +------------------------------------------------------+  |
+|  | Layer 2: Epoch Queue                                 |  |
+|  | [E+1][E+2]...[E+N]                                   |  |
+|  | Buckets for mid-term timers                          |  |
+|  +------------------------------------------------------+  |
+|                                                            |
+|  +------------------------------------------------------+  |
+|  | Layer 3: Overflow Sorted Set                         |  |
+|  | Merkle BST for long-term timers                      |  |
+|  +------------------------------------------------------+  |
++------------------------------------------------------------+
+                         |
+                         v
++------------------------------------------------------------+
+|                  Gas Bidding Agents (GBA)                  |
+|  - Each actor specifies GBA contract                       |
+|  - GBA returns bid based on block context                  |
+|  - Priority queue orders by effective bid                  |
++------------------------------------------------------------+
+
+```
+
+**Execution Flow**:
+1. Actor schedules a timer (conceptual API; CIP-1 requires specifying a Gas Bidding Agent)
+2. Timer stored in calendar queue
+3. At trigger block:
+   - Query GBA for bid
+   - Add to priority queue
+   - Execute highest bids first (within budget)
+
+**See**: [Scheduler Overview](/architecture/scheduler/overview)
+
+### 5. Off-Chain Compute (CIP-2)
+
+**Purpose**: Verifiable execution of AI models, API calls, heavy computation
+
+**Architecture**:
+```
++------------------------------------------------------------+
+|                    On-Chain Components                     |
+|                                                            |
+|  +--------------------+  +--------------------+            |
+|  | Task Dispatcher    |  | Runner Registry    |            |
+|  | - Submit task      |  | - Registration     |            |
+|  | - Lock payment     |  | - Active list      |            |
+|  | - VRF snapshot     |  | - Health decay     |            |
+|  +--------------------+  +--------------------+            |
+|                                                            |
+|  +--------------------+                                     |
+|  | Runner Submit      |                                     |
+|  | - Verify select    |                                     |
+|  | - Store result     |                                     |
+|  | - Trigger CB       |                                     |
+|  +--------------------+                                     |
++------------------------------------------------------------+
+
+                         | Task & Result submission |
+                         v
+
++------------------------------------------------------------+
+|                   Off-Chain Runners                        |
+|                                                            |
+|  +------------------------------------------------------+  |
+|  | Runner Service                                        | |
+|  | - Monitor TaskSubmitted events                        | |
+|  | - Calculate VRF selection                             | |
+|  | - Execute: download model, run inference              | |
+|  | - Generate proof (if required)                        | |
+|  | - Submit result on-chain                              | |
+|  +------------------------------------------------------+  |
++------------------------------------------------------------+
+
+```
+
+**Selection Mechanism** (VRF-based):
+```
+// Pseudocode (conceptual): VRF Selection = Deterministic + Verifiable + Decentralized
+
+start_index = hash(vrf_seed + (submission_block - vrf_generation_block)) % active_list_size
+selected_runners = active_list[start_index : start_index + N]  # wrap around (ring buffer)
+
+✅ No central coordinator
+✅ Anyone can verify selection
+✅ Fair over time
+```
+
+**Continuation flow**:
+
+```
+Actor handler
+  -> submit runner job and persist continuation
+  -> selected runner executes LLM / HTTP / MCP work off-chain
+  -> runner submits result and proof on-chain
+  -> generated resume handler commits result to actor state
+```
+
+Builders usually write this as one `@runner.continuation` function in the SDK. The code before `await runner.*(...)` submits the job; the code after the `await` runs later when the result arrives.
+
+**See**: [Off-Chain Compute](/architecture/offchain/overview)
+
+### 6. Encrypted Distributed Storage (CBFS)
+
+**Purpose**: Store data too large for on-chain persistence — models, datasets, media, logs — with end-to-end encryption and redundancy.
+
+**Architecture**:
+```
++------------------------------------------------------------+
+|                    Client (actor or runner)                |
+|                                                            |
+|  cbfs-fuse (mount) ── cbfs-sdk (Volume API) ── cbfs-auth   |
+|        |                      |                    |       |
+|        v                      v                    v       |
+|  write-back cache      AES-256-GCM encrypt    RAS tokens   |
+|                                |                           |
+|                                v                           |
+|                       Reed-Solomon (K+M)                   |
+|                                |                           |
+|                                v                           |
+|                        QUIC transport                      |
++------------------------------------------------------------+
+                                |
+                                v
++------------------------------------------------------------+
+|                      Storage Relays                        |
+|  cbfs-node daemons × N — Sled blob store, shard serving    |
++------------------------------------------------------------+
+                                |
+        Control plane via Cowboy RPC: volume registry,
+        manifest authority, delegated capability tokens
+```
+
+**Key properties:**
+- **Client-side encryption** — storage nodes never see plaintext
+- **Reed-Solomon erasure coding** — `K` data + `M` parity shards, recover from any `K`
+- **Delegated auth** — owner signs short-lived capability tokens; no chain write on every data-plane call
+- **Self-healing** — background repair detects dead nodes and re-shards
+- **FUSE mount** — volumes appear as normal filesystems to actors and runners
+
+<Note>
+  The Actor VM still forbids ordinary file I/O during deterministic execution. CBFS access is mediated by protocol/runtime APIs and delegated capability tokens; runner-side jobs may use mounted volumes, while actor state remains the consensus key-value store.
+</Note>
+
+**See**: [CIP-4 State Storage](/cips/cip-4-storage) · [CIP-9 Runner Storage](/cips/cip-9-runner-storage)
+
+## Transaction Lifecycle
+
+```
+1. Transaction Submission
+   |-- User creates transaction
+   |-- Signs with private key
+   \-- Broadcasts to network
+
+2. Mempool
+   |-- Validators receive transaction
+   |-- Validate signature, nonce, balance
+   \-- Add to mempool (priority by tip)
+
+3. Block Proposal
+   |-- Leader selects transactions from mempool
+   |-- Orders by priority (effective tip)
+   \-- Proposes block
+
+4. Block Validation
+   |-- Validators execute transactions
+   |-- Check state transitions
+   |-- Verify gas limits
+   \-- Sign vote (QC)
+
+5. Block Finalization
+   |-- QC formed (>= 2/3 votes)
+   |-- Block committed to chain
+   |-- State root updated
+   \-- Receipts generated
+
+6. State Update
+   |-- Actor state persisted
+   |-- Balances updated
+   |-- Events emitted
+   \-- Next nonce incremented
+
+```
+
+## State Organization
+
+```
+Global State (σ)
+|-- Accounts
+|   |-- Balances (address -> amount)
+|   |-- Nonces (address -> uint64)
+|   \-- Actor Code (address -> bytecode)
+|
+|-- Actor State
+|   \-- Key-Value Storage (actor_address + key -> value)
+|
+|-- Scheduler State
+|   |-- Timer queues (hierarchical calendar queue)
+|   \-- Scheduling indices and metadata
+|
+|-- Off-Chain State
+|   |-- Active Runner List
+|   |-- Pending Tasks
+|   \-- Task Results
+|
+\-- Protocol State
+    |-- Validator Set
+    |-- Basefees (cycle & cell)
+    \-- Governance Parameters
+```
+
+**State Root**: Merkle tree root of entire state
+
+**State Transition**: `σ' = STF(σ, B)` where B is block
+
+## Network Layer
+
+**P2P Network**:
+- Gossip protocol for transaction propagation
+- Block proposal distribution
+- Vote (QC) aggregation
+- State synchronization
+
+**Node Types**:
+1. **Validator**: Participates in consensus, proposes/validates blocks
+2. **Full Node**: Stores full state, serves queries
+3. **Light Client**: Only block headers, verifies proofs
+4. **Runner**: Executes off-chain tasks (not part of consensus)
+
+**Communication**:
+```
+Validators <--> P2P Network <--> Full Nodes
+                  ↕
+              Runners (off-chain)
+              • Monitor events
+              • Submit results
+```
+
+## Storage Layer
+
+**Components**:
+
+1. **State Storage**:
+   - Merkleized key-value store
+   - Key: account/actor address + storage key
+   - Value: serialized data
+   - Root hash in block header
+
+2. **Block Storage**:
+   - Sequential blocks
+   - Headers + transactions
+   - Indexed by height and hash
+
+3. **Transaction Log**:
+   - All transactions (historical)
+   - Receipts with events
+   - Queryable by hash, block, address
+
+4. **Archive Node** (optional):
+   - Full historical state
+   - Every block's complete state
+   - For queries like "balance at block X"
+
+## Security Model
+
+**Threat Model**:
+- Byzantine validators (up to 1/3)
+- Malicious actors (smart contracts)
+- DoS attacks (computational, storage)
+- Network attacks (eclipse, Sybil)
+
+**Defenses**:
+
+1. **Consensus Security**:
+   - BFT tolerance (2/3+ honest required)
+
+2. **VM Security**:
+   - Sandboxed execution (no I/O)
+   - Resource limits (cycles, cells, memory)
+   - Deterministic execution (no non-determinism)
+
+3. **Gas Economics**:
+   - Dual-metered prevents abuse
+   - Basefee burn (anti-spam)
+   - Priority market (fair access)
+
+4. **Off-Chain Security**:
+   - VRF-based selection (no coordinator)
+   - Configurable verification requirements (per CIP-2)
+   - Economic incentives (per application design)
+
+## Performance and Governance
+
+Performance metrics, governance processes, and network parameters are implementation-dependent and subject to change. Refer to authoritative releases and CIPs for normative updates when available.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Actor VM Deep Dive" icon="microchip" href="/architecture/actor-vm/overview">
+    How the PVM achieves deterministic Python execution
+  </Card>
+
+  <Card title="Fee Model" icon="coins" href="/architecture/fees/overview">
+    Dual-metered gas and EIP-1559 basefees
+  </Card>
+
+  <Card title="Scheduler" icon="clock" href="/architecture/scheduler/overview">
+    Native timer system (CIP-1)
+  </Card>
+
+  <Card title="Off-Chain Compute" icon="server" href="/architecture/offchain/overview">
+    Verifiable runner network (CIP-2)
+  </Card>
+
+  <Card title="State Storage" icon="database" href="/cips/cip-4-storage">
+    QMDB state store + Merkle proofs (CIP-4)
+  </Card>
+
+  <Card title="SDK Overview" icon="python" href="/developers/sdk">
+    The `cowboy_sdk` Python library (CIP-6)
+  </Card>
+</CardGroup>
+
+## Further Reading
+
+- [Design Principles](/overview/design-principles)
+- [What is Cowboy](/introduction/what-is-cowboy)
+- [Repository Layout](/getting-started/repo-layout)

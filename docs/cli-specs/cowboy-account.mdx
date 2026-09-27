@@ -1,0 +1,93 @@
+---
+title: "cowboy account"
+description: Query account information on the Cowboy blockchain
+icon: user
+---
+
+## Synopsis
+
+```bash
+cowboy account balance --address <address>
+cowboy account nonce --address <address>
+cowboy account info --address <address>
+```
+
+## Subcommands
+
+### `cowboy account balance`
+
+Query the balance of any account by address.
+
+**Behavior:**
+
+1. Send a request to the RPC endpoint to fetch the account balance.
+2. Print the balance in CBY.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--address` | Required | Account address to query (hex) |
+
+**Example:**
+
+```bash
+$ cowboy account balance --address 0x7a3B...F92E
+Balance: 1000.000000 CBY
+```
+
+---
+
+### `cowboy account nonce`
+
+Query the current nonce of an account.
+
+**Behavior:**
+
+1. Send a request to the RPC endpoint to fetch the account nonce.
+2. Print the nonce value.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--address` | Required | Account address to query (hex) |
+
+**Example:**
+
+```bash
+$ cowboy account nonce --address 0x7a3B...F92E
+Nonce: 42
+```
+
+---
+
+### `cowboy account info`
+
+Query full account information.
+
+**Behavior:**
+
+1. Send a request to the RPC endpoint to fetch all account details.
+2. Print balance, nonce, and account type (EOA or Actor).
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--address` | Required | Account address to query (hex) |
+
+**Example:**
+
+```bash
+$ cowboy account info --address 0x7a3B...F92E
+Address: 0x7a3B...F92E
+Type: EOA
+Balance: 1000.000000 CBY
+Nonce: 42
+```
+
+## Edge Cases
+
+- If the address doesn't exist on-chain, commands return zero values (not an error).
+- All subcommands are read-only and do not require a private key.

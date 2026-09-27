@@ -1,0 +1,44 @@
+---
+title: "E1604 — Invalid job schema"
+description: "Invalid job schema"
+---
+
+# E1604 — Invalid job schema
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1604` |
+| **Slug** | `E1604` |
+| **Category** | `validation` (Validation) |
+| **CIP** | CIP-2 |
+
+## What happened
+
+Invalid job schema.
+
+## Why it happened
+
+The job specification JSON does not conform to the rate-card schema.
+
+## How to fix
+
+Fix the job JSON against the rate-card schema.
+
+## Receipt example
+
+```json
+{
+  "code": 1604,
+  "slug": "E1604",
+  "category": "validation",
+  "what": "Invalid job schema",
+  "fix": "Fix the job JSON against the rate-card schema.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1604"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

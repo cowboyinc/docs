@@ -1,0 +1,44 @@
+---
+title: "E1201 — Out of gas inside the PVM"
+description: "Out of gas inside the PVM"
+---
+
+# E1201 — Out of gas inside the PVM
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1201` |
+| **Slug** | `E1201` |
+| **Category** | `gas` (Gas) |
+| **CIP** | CIP-3 |
+
+## What happened
+
+Out of gas inside the PVM.
+
+## Why it happened
+
+The actor handler exhausted its cycle or cell budget during execution.
+
+## How to fix
+
+Raise the handler's cycle/cell budget or reduce work in the hot path.
+
+## Receipt example
+
+```json
+{
+  "code": 1201,
+  "slug": "E1201",
+  "category": "gas",
+  "what": "Out of gas inside the PVM",
+  "fix": "Raise the handler's cycle/cell budget or reduce work in the hot path.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1201"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

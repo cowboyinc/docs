@@ -1,0 +1,96 @@
+---
+title: "cowboy actor new"
+description: Scaffold a new actor from a template
+icon: file-code
+---
+
+## Synopsis
+
+```bash
+cowboy actor new <name>
+```
+
+## Behavior
+
+1. Create a directory `actors/<name>/`.
+2. Write `actors/<name>/main.py` with the actor template (see below).
+3. Print the created file path and next steps.
+
+## Actor Template
+
+```python
+from cowboy_sdk import actor, public
+
+
+@actor
+class CounterActor:
+    """On-chain counter. State lives in self.storage['counter']."""
+
+    def init(self, payload=None):
+        self.storage["__name__"] = "Counter"
+        self.storage["__description__"] = "Minimal on-chain counter (increment + get_count)."
+        self.storage["__version__"] = "1.0.0"
+        self.storage["counter"] = 0
+
+    @public(decode="raw")
+    def increment(self, payload=None):
+        count = (self.storage.get("counter") or 0) + 1
+        self.storage["counter"] = count
+        return str(count).encode()
+
+    @public(decode="raw")
+    def get_count(self, payload=None):
+        count = self.storage.get("counter") or 0
+        return str(count).encode()
+
+
+def _get():
+    return CounterActor()
+
+
+def init(payload):      return _get().init(payload)
+def increment(payload): return _get().increment(payload)
+def get_count(payload): return _get().get_count(payload)
+```
+
+This template:
+- Defines an SDK actor class decorated with `@actor`.
+- Stores durable state in `self.storage`.
+- Initializes actor metadata and counter state through `init`.
+- Has two handlers: `increment` (write) and `get_count` (read).
+- Includes module-level wrapper functions the PVM calls by handler name.
+
+## Example
+
+```bash
+$ cowboy actor new counter
+Created actor:
+  actors/counter/main.py
+
+Next steps:
+  # Edit the actor
+  vim actors/counter/main.py
+
+  # Deploy to validator
+  cowboy actor deploy --code actors/counter/main.py
+```
+
+## Edge Cases
+
+- **Name collision** -- If `actors/<name>/` already exists, print an error and exit. Do not overwrite.
+- **No actors/ directory** -- Create `actors/` if it doesn't exist.
+- **Invalid name** -- Actor names must be valid directory names. Reject names containing `/`, `..`, or whitespace.
+
+## Testing
+
+```bash
+# Create actor
+cowboy actor new myactor
+cat actors/myactor/main.py   # Should contain the template
+
+# Verify collision detection
+cowboy actor new myactor      # Should print error, not overwrite
+
+# Deploy and test (requires running validator)
+cowboy actor deploy --code actors/myactor/main.py
+```

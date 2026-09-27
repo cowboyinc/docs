@@ -1,0 +1,44 @@
+---
+title: "E1002 — Nonce mismatch"
+description: "Nonce mismatch"
+---
+
+# E1002 — Nonce mismatch
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1002` |
+| **Slug** | `E1002` |
+| **Category** | `validation` (Validation) |
+
+
+## What happened
+
+Nonce mismatch.
+
+## Why it happened
+
+The transaction nonce does not match the expected value for the sender account. Each account's nonce increments by 1 after every committed transaction.
+
+## How to fix
+
+Fetch the account's current nonce via the RPC and retry with that value.
+
+## Receipt example
+
+```json
+{
+  "code": 1002,
+  "slug": "E1002",
+  "category": "validation",
+  "what": "Nonce mismatch",
+  "fix": "Fetch the account's current nonce via the RPC and retry with that value.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1002"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

@@ -1,0 +1,44 @@
+---
+title: "E1227 — Persistent store error"
+description: "Persistent store error"
+---
+
+# E1227 — Persistent store error
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1227` |
+| **Slug** | `E1227` |
+| **Category** | `internal` (Internal) |
+
+
+## What happened
+
+Persistent store error.
+
+## Why it happened
+
+The persistent storage backend encountered an error.
+
+## How to fix
+
+Retry the transaction. Report with the tx hash if it persists.
+
+## Receipt example
+
+```json
+{
+  "code": 1227,
+  "slug": "E1227",
+  "category": "internal",
+  "what": "Persistent store error",
+  "fix": "Retry the transaction.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1227"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

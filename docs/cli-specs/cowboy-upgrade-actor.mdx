@@ -1,0 +1,45 @@
+---
+title: "cowboy upgrade-actor"
+description: Upgrade a deployed actor's code (system deployers only)
+icon: refresh-cw
+---
+
+## Synopsis
+
+```bash
+cowboy upgrade-actor --actor <address> --code <path> [--manifest-json <path>] [flags]
+```
+
+## Behavior
+
+1. Load the private key using [key auto-discovery](/cli-specs/key-auto-discovery). The sender address must appear in `genesis.system_deployers`; the chain rejects upgrades from other senders.
+2. Read the new actor source from `--code`.
+3. Optionally read a new `ActorManifest` from `--manifest-json`. The new manifest must be a **subset** of the current manifest — you can drop entitlements, never add them.
+4. Submit an `UpgradeActor` transaction carrying the new code hash and manifest.
+5. Print the transaction hash.
+
+The upgrade replaces the actor's code starting from the next block. State is preserved — only the code changes.
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--actor` | Required | Target actor address (hex) |
+| `--code` | Required | Path to the new Python source file |
+| `--manifest-json` | None | Optional new `ActorManifest` JSON (must be a subset of current) |
+| `--private-key` | Auto-discovered | Path to private key file. Sender must be a system deployer |
+| `--rpc-url` | Auto-discovered | RPC endpoint |
+
+## Example
+
+```bash
+$ cowboy upgrade-actor --actor 0xdef456... --code actors/counter/v2.py
+Transaction: 0xabc123...
+  Upgrade queued for 0xdef456...
+```
+
+## Edge Cases
+
+- **Non-deployer sender** — The transaction is accepted by the mempool but reverts on execution. The receipt will contain `UpgradeNotAuthorized`.
+- **Manifest widening** — Any entitlement in the new manifest that is not in the current manifest fails validation and reverts with `ManifestWideningNotAllowed`.
+- **Same code hash** — An upgrade to identical code is a no-op but still costs gas.

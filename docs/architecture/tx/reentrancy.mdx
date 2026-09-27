@@ -1,0 +1,43 @@
+---
+title: "Reentrancy"
+description: "Protection against reentrancy attacks"
+---
+
+## Introduction
+
+This page describes Cowboy’s protocol-level guarantees that prevent reentrancy within an actor’s execution. The guarantees follow the Cowboy whitepaper and CIPs and avoid assumptions beyond them.
+
+<Tip>
+  Reentrancy is prevented by the actor model’s single-threaded mailbox processing and deterministic async scheduling; cross-actor and off-chain work is queued and executed later.
+</Tip>
+
+## Execution Model and Mailbox Semantics (Whitepaper)
+
+- Actors are deterministic Python programs with private state that communicate via asynchronous message passing. Each actor processes messages from its mailbox sequentially. This model eliminates intra-invocation reentrancy by construction: while an actor handler is executing, no other message can interleave execution on that actor’s state.
+- Cowboy establishes a single canonical block order using a Simplex-based BFT protocol. Within each block, an actor’s handler runs to completion (subject to resource limits) before the next message to that actor is considered.
+
+## Deterministic Async Scheduling (CIP‑3)
+
+- The protocol prohibits true concurrent execution. All async/await code executes in a single thread in strictly deterministic order. Await scheduling follows FIFO; concurrency primitives that could introduce non-deterministic ordering are not allowed.
+- As a result, an actor cannot be re-entered mid-execution via asynchronous control flow; any subsequent work resumes only after the current handler completes and control returns to the scheduler.
+
+## Timers and Deferred Callbacks (CIP‑1 and CIP‑2)
+
+- Timers (CIP‑1): Due timer messages are delivered by the Autonomous Actor Scheduler into a dedicated per-block processing budget. If not executed in a given block (e.g., budget exhausted or low bids), they are carried over to the next block rather than duplicated. This delivery model prevents multiple, overlapping executions of the same timer and avoids reentrancy into an in-progress handler.
+- Deferred callbacks (CIP‑2): After N required off-chain results are collected, the Runner Submission Contract constructs a deferred transaction containing the developer’s callback. Validators include and execute this callback in a future block. Because callbacks are realized as separate transactions in later blocks, they cannot synchronously re-enter the originating actor during the original handler’s execution. Within the callback, the actor must call `consume_result` to finalize the task, ensuring single settlement.
+
+## Implications for Reentrancy
+
+- Intra-transaction reentrancy is disallowed by design: an actor’s handler is single-threaded and non-interleaved.
+- Cross-actor and off-chain interactions occur via queued messages, timers, or deferred transactions that are scheduled and executed later, not inline. State changes are thus serialized at handler boundaries.
+
+## Further Reading
+
+- [Scheduler Overview](/architecture/scheduler/overview)
+- [Off-Chain Lifecycle](/architecture/offchain/lifecycle)
+- [Idempotency](/architecture/tx/idempotency)
+- [CIP-1](/cips/cip-1-actor-scheduler)
+- [CIP-2](/cips/cip-2-offchain-compute)
+- [CIP-3](/cips/cip-3-fee-model)
+
+

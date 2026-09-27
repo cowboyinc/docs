@@ -1,0 +1,92 @@
+---
+title: "cowboy volume"
+description: CIP-9 volume operations — mount, read, and inspect CBFS volumes
+icon: hard-drive
+---
+
+## Synopsis
+
+```bash
+cowboy volume mount --name <string> --mount-point <path> [--key-file <path>] [--cbfs-mount <path>]
+cowboy volume cat   --name <string> --path <string> [--output <path>] [--key-file <path>] [--cbfs-cat <path>]
+cowboy volume info  --name <string>
+```
+
+Volumes are CIP-9 encrypted object stores. Each volume has an owner, a name (alphanumeric, `-`, `_`, `.` only, max 256 bytes), and a set of runners that store encrypted chunks. The CLI is a thin wrapper around the `cbfs-mount` and `cbfs-cat` binaries for chain-aware key resolution.
+
+## Subcommands
+
+### `cowboy volume mount`
+
+Mount a CBFS volume as a FUSE filesystem.
+
+**Behavior:**
+
+1. Look up the volume record on-chain for the owner + name.
+2. Resolve the volume's encryption key (from `--key-file` if supplied, or derived from the owner's private key).
+3. Invoke `cbfs-mount` with the runner set and key to present the volume at `--mount-point`.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name` | Required | Volume name |
+| `--mount-point` | Required | Local directory to mount at |
+| `--key-file` | None | Optional path to a volume key file (otherwise derived) |
+| `--cbfs-mount` | `cbfs-mount` on `$PATH` | Explicit path to the `cbfs-mount` binary |
+| `--owner` | Derived from `--private-key` | Volume owner address |
+| `--private-key` | Auto-discovered | Used to derive keys if `--key-file` is not supplied |
+| `--rpc-url` | Auto-discovered | RPC endpoint |
+
+### `cowboy volume cat`
+
+Read a single file from a volume without mounting.
+
+**Behavior:**
+
+1. Look up the volume record and resolve the encryption key (as above).
+2. Invoke `cbfs-cat` for the specified path, writing bytes to `--output` or stdout.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name` | Required | Volume name |
+| `--path` | Required | Path within the volume |
+| `--output` | stdout | Optional local output file |
+| `--key-file` | None | Optional path to a volume key file |
+| `--cbfs-cat` | `cbfs-cat` on `$PATH` | Explicit path to the `cbfs-cat` binary |
+| `--owner` | Derived from `--private-key` | Volume owner address |
+| `--private-key` | Auto-discovered | |
+| `--rpc-url` | Auto-discovered | |
+
+### `cowboy volume info`
+
+Show on-chain metadata for a volume: owner, runner set, quota, and manifest root.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name` | Required | Volume name |
+| `--owner` | Derived | Volume owner address |
+| `--rpc-url` | Auto-discovered | RPC endpoint |
+
+## Example
+
+```bash
+$ cowboy volume mount --name training-data --mount-point ./data
+  Resolved volume 0x7a3B... owner=0x...
+  Runners: 3 (replication factor 2)
+  cbfs-mount attached at ./data
+
+$ cowboy volume cat --name training-data --path configs/train.yaml
+epochs: 5
+batch_size: 32
+```
+
+## Edge Cases
+
+- **Invalid name** — Names outside the allowed alphabet (alphanumeric + `-_. `) are rejected before any RPC call.
+- **Missing cbfs binaries** — Commands fail fast with a clear "`cbfs-mount` not found on PATH" error. Override with `--cbfs-mount` / `--cbfs-cat`.
+- **Unauthorised reader** — If the caller isn't the owner and has no entitlement, key resolution fails locally (the encrypted chunks are useless without a valid key).

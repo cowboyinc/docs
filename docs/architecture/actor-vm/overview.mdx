@@ -1,0 +1,237 @@
+---
+title: Actor VM Overview
+description: Understanding Cowboy's deterministic Python execution environment
+---
+
+## Introduction
+
+The **Actor VM** is Cowboy's deterministic Python execution environment. It enables developers to write smart contracts in Python while maintaining the strict determinism and security requirements of a blockchain protocol.
+
+<Tip>
+  **Key Insight**: Cowboy achieves determinism not by creating a new language, but by carefully constraining Python to a deterministic subset and providing a metered, sandboxed execution environment.
+</Tip>
+
+> Note: Examples in this page are conceptual snippets/pseudocode. Final interfaces and usage should follow the SDK and Developer Guide. CIP specifications define normative protocol behavior.
+
+## Actor Model Fundamentals
+
+### What is an Actor?
+
+An **Actor** is an independent entity with:
+
+```
++------------------------------------------------------------+
+|                      Actor Instance                        |
++------------------------------------------------------------+
+|  - State:    Persistent storage                            |
+|  - Code:     Python class                                  |
+|  - Mailbox:  Message queue                                 |
+|  - Timers:   Scheduled execution                           |
+|  - Balance:  CBY tokens                                    |
+|  - Address:  Unique identifier                             |
++------------------------------------------------------------+
+
+```
+
+### Core Properties
+
+<AccordionGroup>
+  <Accordion title="Isolated State" icon="lock">
+    Each actor has its own storage. No shared memory between actors. Persistent state MUST use protocol storage APIs; in-memory variables are ephemeral per invocation.
+  </Accordion>
+  
+  <Accordion title="Message-Driven" icon="envelope">
+    Communication happens via asynchronous messages; avoid synchronous assumptions about order.
+  </Accordion>
+  
+  <Accordion title="Single-Threaded" icon="ban">
+    One message processed at a time. No concurrency within an actor.
+  </Accordion>
+  
+  <Accordion title="Autonomous" icon="robot">
+    Can schedule its own future execution via timers (see CIP-1).
+  </Accordion>
+</AccordionGroup>
+
+## Python VM Architecture
+
+### Execution Flow
+
+```
++--------------------------------------------------------------------+
+|  1. Transaction Submission                                         |
+|    - User submits transaction with payload                         |
+|    - Payload: target actor + handler + arguments                   |
++--------------------------------------------------------------------+
+                               |
+                               v
++--------------------------------------------------------------------+
+|  2. Pre-Execution Metering                                         |
+|    - Charge intrinsic calldata (payload size -> Cells)             |
+|    - Load actor state from storage                                 |
+|    - Initialize VM with resource limits                            |
++--------------------------------------------------------------------+
+                               |
+                               v
++--------------------------------------------------------------------+
+|  3. Bytecode Execution                                             |
+|    - Interpret Python bytecode                                     |
+|    - Meter every instruction (-> Cycles)                           |
+|    - Track memory allocation (-> Cells)                            |
+|    - Enforce resource limits                                       |
++--------------------------------------------------------------------+
+                               |
+                               v
++--------------------------------------------------------------------+
+|  4. State Commitment                                               |
+|    - Serialize modified state                                      |
+|    - Meter storage writes (-> Cells)                               |
+|    - Update Merkle state tree                                      |
++--------------------------------------------------------------------+
+                               |
+                               v
++--------------------------------------------------------------------+
+|  5. Fee Settlement                                                 |
+|    - Calculate total cost (Cycles + Cells)                         |
+|    - Burn basefee portion                                          |
+|    - Pay tip to block producer                                     |
++--------------------------------------------------------------------+
+```
+
+### VM Components
+
+<Tabs>
+  <Tab title="Interpreter">
+    **Pure bytecode interpretation** (no JIT)
+    
+    **Key properties:**
+    - Deterministic: Same bytecode → same execution
+    - Metered: Every instruction charged
+    - Sandboxed: No escape to host system
+  </Tab>
+  
+  <Tab title="Memory Manager">
+    **Deterministic memory management**
+    
+    **Memory properties:**
+    - Per-call heap memory hard limit (CIP‑3)
+    - Reference counting with deterministic reclamation
+    - No cycle detection
+  </Tab>
+  
+  <Tab title="Sandbox">
+    **Isolation from host system**
+    
+    **Enforcement methods:**
+    - Import whitelist (CIP‑3)
+    - Protocol host function APIs (deterministic, metered)
+  </Tab>
+  
+  <Tab title="Metering">
+    **Dual-metered resource tracking**
+    
+    **Metering points:**
+    - **Cycles**: Every bytecode instruction (CIP‑3)
+    - **Cells**: Calldata, storage I/O, blob commits, return data; object allocations accounted per CIP‑3
+  </Tab>
+</Tabs>
+
+## Determinism Guarantees
+
+Cowboy's VM enforces determinism: given the same input, all nodes produce identical output.
+
+### Determinism Requirements
+
+<Steps>
+  <Step title="No System Dependencies">
+    No access to:
+    - System time
+    - Local randomness
+    - File system
+    - Network
+    - Environment variables
+    
+    **Rationale**: These produce different values across machines or times.
+  </Step>
+  
+  <Step title="Deterministic Arithmetic">
+    All floating-point operations use a **software implementation** of IEEE 754.
+  </Step>
+  
+  <Step title="Deterministic Memory Management">
+    **Reference counting** with immediate cleanup; destruction costs are metered in Cycles per CIP‑3.
+  </Step>
+  
+  <Step title="No JIT Compilation">
+    Pure interpretation only; JIT is prohibited.
+  </Step>
+  
+  <Step title="Dictionary Ordering and Serialization">
+    Do not rely on in-memory iteration order when results depend on ordering. When order matters, sort keys explicitly. During serialization, dictionary keys MUST be sorted lexicographically (CIP‑3) to ensure determinism.
+  </Step>
+</Steps>
+
+### Testing Determinism
+
+A determinism test suite verifies that identical inputs produce identical outputs and state transitions across environments, covering instruction metering, serialization (sorted keys), exception handling costs, and software floating‑point behavior.
+
+## Resource Limits
+
+Per-call resource limits and protocol constraints prevent DoS attacks:
+
+- **Cycles**: Instruction-level metering with protocol-defined hard limits (CIP‑3)
+- **Cells**: Data/IO metering with protocol-defined hard limits (CIP‑3)
+- **Memory**: Per-transaction/per-call heap memory hard limit per CIP‑3
+- **Integer Size**: 4096-bit maximum; exceeding raises OverflowError (CIP‑3)
+- **Stack/Recursion**: Protocol-defined limits to prevent unbounded depth
+- **Storage Size**: Per-actor quotas with rent/pruning policies per protocol
+
+## Protocol Host Functions (Categories)
+
+Actors interact with the protocol via deterministic, metered host functions (non-exhaustive categories):
+
+- **Storage**: Persistent key/value operations; blob commits for large content-addressed data
+- **Messaging**: Asynchronous message send/receive
+- **Timers**: Schedule/cancel per CIP‑1; execution prioritized via GBA under per-block timer budget
+- **Cryptography**: Hashing and signature verification; VRF access via protocol APIs
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Minimize Storage Writes" icon="database">
+    Batch writes where possible to reduce Cells; design data layout to minimize serialization overhead.
+  </Accordion>
+  
+  <Accordion title="Control Input Size" icon="scale-balanced">
+    Validate input sizes early; avoid unbounded loops; fail fast on invalid data.
+  </Accordion>
+  
+  <Accordion title="Deterministic Ordering" icon="list-ol">
+    Sort keys or items when order affects results; rely on CIP‑3 serialization guarantees.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Actor Identity" icon="id-card" href="/architecture/actor-vm/actor-identity">
+    Discoverable metadata via dunder storage keys
+  </Card>
+  <Card title="Determinism & Sandbox" icon="lock" href="/architecture/actor-vm/determinism-and-sandbox">
+    Deep dive into how determinism is achieved
+  </Card>
+  <Card title="Resource Limits" icon="gauge" href="/architecture/actor-vm/resource-limits">
+    Detailed specification of all resource limits
+  </Card>
+  <Card title="Minimal Actor Example" icon="code" href="/architecture/actor-vm/minimal-actor">
+    Build your first actor step-by-step
+  </Card>
+  <Card title="Fee Model" icon="dollar-sign" href="/architecture/fees/overview">
+    Understand Cycles and Cells metering
+  </Card>
+</CardGroup>
+
+## Further Reading
+
+- [Fee Model Overview](/architecture/fees/overview)
+- [Actor VM Overview](/architecture/actor-vm/overview)

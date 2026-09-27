@@ -1,0 +1,479 @@
+---
+title: Key Format Specification
+description: How Cowboy stores, encodes, and discovers private keys
+icon: key
+---
+
+## Overview
+
+This document specifies how Cowboy private keys are stored on disk, encoded for transport, and backed up by users. Cowboy uses a self-describing, checksummed PEM envelope as the primary storage format, BIP-39 mnemonics with BIP-32/44 HD derivation as the human-readable backup and multi-key format, and an encrypted JSON keystore for production deployments.
+
+Cowboy uses **secp256k1** (ECDSA) for all account keys. This is the same curve used by Ethereum and Bitcoin, which gives Cowboy native Ethereum key compatibility — the same private key can control both a Cowboy account and an EVM address.
+
+<Tip>
+  **Design Principle**: Keys should be self-describing, checksummed, and familiar. A developer should be able to `cat .cowboy/key` and immediately understand what they're looking at.
+</Tip>
+
+## Key Format: PEM Envelope
+
+### File Format (`.cowboy/key`)
+
+The primary on-disk format is a PEM-style envelope with base64-encoded key material:
+
+```
+-----BEGIN COWBOY PRIVATE KEY-----
+Curve: secp256k1
+Checksum: 9a3b
+/XJ/awFahf1ANaMQaqjnF4UH0K98RyM0cVhitKetGGY=
+-----END COWBOY PRIVATE KEY-----
+```
+
+### Structure
+
+```
++--------------------------------------------------+
+|  PEM Envelope                                     |
++--------------------------------------------------+
+|  Header:   -----BEGIN COWBOY PRIVATE KEY-----     |
+|  Metadata: Curve: secp256k1                       |
+|            Checksum: <4 hex chars>                |
+|  Body:     <base64-encoded 32-byte key>           |
+|  Footer:   -----END COWBOY PRIVATE KEY-----       |
++--------------------------------------------------+
+```
+
+### Specification
+
+<Steps>
+  <Step title="Header and Footer">
+    The file MUST begin with `-----BEGIN COWBOY PRIVATE KEY-----` and end with `-----END COWBOY PRIVATE KEY-----`, each on their own line. These markers make the format self-describing and prevent accidental use of non-key files.
+  </Step>
+
+  <Step title="Metadata Headers">
+    Between the header and the base64 body, zero or more `Key: Value` metadata lines MAY appear. Defined headers:
+
+    | Header | Required | Values | Description |
+    |--------|:---:|--------|-------------|
+    | `Curve` | Yes | `secp256k1` | The elliptic curve for this key |
+    | `Checksum` | Yes | 4 hex characters | First 4 hex characters of `SHA-256(raw_key_bytes)` |
+
+    Unknown headers MUST be ignored by parsers (forward compatibility).
+  </Step>
+
+  <Step title="Body">
+    A single line of standard base64 (RFC 4648) encoding of the raw 32-byte private key. The line MUST NOT contain whitespace.
+  </Step>
+
+  <Step title="Trailing Newline">
+    The file SHOULD end with a single trailing newline after the footer. Parsers MUST tolerate missing or extra trailing newlines.
+  </Step>
+</Steps>
+
+### Address Derivation
+
+From a secp256k1 private key, the Cowboy address is derived using the Ethereum-standard method:
+
+1. Compute the uncompressed public key (64 bytes, without the `04` prefix).
+2. Hash with Keccak-256.
+3. Take the last 20 bytes as the address.
+
+This means a Cowboy address **is** an Ethereum address — the same key produces the same `0x...` address on both chains.
+
+### Checksum Calculation
+
+The checksum provides corruption detection:
+
+```python
+import hashlib, base64
+
+raw_key = base64.b64decode(body_line)          # 32 bytes
+digest  = hashlib.sha256(raw_key).hexdigest()  # 64 hex chars
+checksum = digest[:4]                          # first 4 hex chars
+```
+
+On load, the CLI:
+1. Decodes the base64 body to get the raw key bytes.
+2. Computes `SHA-256(raw_key_bytes)`.
+3. Compares the first 4 hex characters against the `Checksum` header.
+4. If they don't match, prints an error and refuses to use the key.
+
+Four hex characters (16 bits) catch 99.998% of random corruptions — sufficient for a local file that is rarely edited by hand.
+
+### Parsing Rules
+
+```
+parse(file_contents):
+  1. Strip leading/trailing whitespace from each line
+  2. Verify BEGIN header is present
+  3. Read Key: Value metadata lines until a non-header line
+  4. Read base64 body (single line)
+  5. Verify END footer is present
+  6. base64-decode body → 32 bytes
+  7. Verify checksum if present
+  8. Return (curve, raw_key_bytes)
+```
+
+### Example: Full Round-Trip
+
+```bash
+# Generate a new key
+$ cowboy wallet create
+Created wallet:
+  Key file:  .cowboy/key
+  Curve:     secp256k1
+  Address:   0x7a3b...f92e
+  Checksum:  9a3b
+
+# Inspect the file
+$ cat .cowboy/key
+-----BEGIN COWBOY PRIVATE KEY-----
+Curve: secp256k1
+Checksum: 9a3b
+/XJ/awFahf1ANaMQaqjnF4UH0K98RyM0cVhitKetGGY=
+-----END COWBOY PRIVATE KEY-----
+
+# The CLI auto-discovers and validates on use
+$ cowboy wallet address
+0x7a3b...f92e
+```
+
+## Backup & Recovery: BIP-39 Mnemonic
+
+For human-readable backup and recovery, Cowboy uses BIP-39 mnemonics as the seed format. Combined with BIP-32/44 hierarchical deterministic (HD) derivation, a single 24-word mnemonic can derive an unlimited number of Cowboy keys.
+
+### Export
+
+```bash
+$ cowboy wallet export --mnemonic
+⚠ Write these 24 words down and store them safely.
+   Anyone with these words can control all derived accounts.
+
+   1. ranch     2. erosion   3. timber    4. hollow
+   5. creek     6. valley    7. blanket   8. autumn
+   9. pepper   10. curious  11. gadget   12. fortune
+  13. ivory    14. canyon    15. submit   16. bachelor
+  17. unveil   18. liberty   19. siege    20. deputy
+  21. harbor   22. toast    23. enforce   24. antenna
+```
+
+### Import
+
+```bash
+$ cowboy wallet import --mnemonic
+Enter 24-word mnemonic: ranch erosion timber hollow ...
+Imported wallet:
+  Key file:  .cowboy/key
+  Curve:     secp256k1
+  Address:   0x7a3b...f92e  (account 0)
+```
+
+### Mnemonic Specification
+
+<AccordionGroup>
+  <Accordion title="Encoding (BIP-39)" icon="list-ol">
+    The mnemonic is generated from 256 bits of cryptographically random entropy:
+
+    1. Generate 32 bytes (256 bits) of random entropy.
+    2. Compute SHA-256 of the entropy; take the first 8 bits as a checksum.
+    3. Concatenate: 256 bits of entropy + 8 bits of checksum = 264 bits.
+    4. Split into 24 groups of 11 bits.
+    5. Each 11-bit value maps to a word in the BIP-39 English wordlist (2048 words).
+
+    The mnemonic is then converted to a 512-bit seed via PBKDF2-HMAC-SHA512 (2048 rounds) with the passphrase `"mnemonic"` (no user passphrase by default). This seed feeds into BIP-32 HD derivation.
+  </Accordion>
+
+  <Accordion title="Wordlist" icon="book">
+    Only the BIP-39 English wordlist is supported. The wordlist is well-established, widely available, and avoids internationalization complexity.
+  </Accordion>
+</AccordionGroup>
+
+### HD Derivation (BIP-32/44)
+
+Cowboy uses standard BIP-32/44 hierarchical deterministic derivation to produce account keys from a mnemonic seed. This is the same scheme used by Ethereum wallets (MetaMask, Ledger, Trezor), which means:
+
+- A Cowboy mnemonic imported into MetaMask produces the same addresses
+- A MetaMask/Ledger mnemonic imported into Cowboy produces the same addresses
+- Hardware wallets work out of the box
+
+#### Derivation Path
+
+```
+m / 44' / 60' / 0' / 0 / account_index
+```
+
+| Level | Value | Meaning |
+|-------|-------|---------|
+| `44'` | BIP-44 | Multi-account HD wallets |
+| `60'` | Ethereum coin type | Ethereum-compatible key derivation |
+| `0'` | Account | Hardened account group |
+| `0` | Change | External chain (receiving addresses) |
+| `account_index` | 0, 1, 2, ... | Sequential account index |
+
+Cowboy uses Ethereum's coin type (`60'`) rather than registering a separate coin type. This is intentional — Cowboy accounts **are** Ethereum addresses, and using the same derivation path means full wallet compatibility.
+
+<Tip>
+  The default account is index `0`. When `cowboy wallet create --from-mnemonic` or `cowboy wallet import --mnemonic` is used without specifying an index, account `0` is derived.
+</Tip>
+
+#### Deriving Multiple Keys
+
+```bash
+# Default: derives account 0
+$ cowboy wallet create --from-mnemonic
+Address: 0x7a3b...f92e  (m/44'/60'/0'/0/0)
+
+# Derive a specific account index
+$ cowboy wallet create --from-mnemonic --account 3
+Address: 0x91c4...a7d1  (m/44'/60'/0'/0/3)
+
+# List all derived accounts
+$ cowboy wallet accounts --mnemonic
+  0: 0x7a3b...f92e  (default)
+  1: 0x52f1...b803
+  2: 0x1d8e...c4f6
+  3: 0x91c4...a7d1
+```
+
+## Hardware Wallet Support
+
+Cowboy supports signing transactions via hardware wallets (Ledger, Trezor) using the same BIP-44 derivation path. The private key never leaves the hardware device.
+
+### How It Works
+
+```
++------------------+       +------------------+       +------------------+
+|   Cowboy CLI     | ----> | Hardware Wallet   | ----> | Signed Tx        |
+|  (builds tx)     |  USB  | (signs with key)  |       | (broadcast)      |
++------------------+       +------------------+       +------------------+
+```
+
+1. The CLI constructs the transaction and computes the signing hash (`keccak256(CBOR(tx))`).
+2. The hash is sent to the hardware wallet over USB/HID.
+3. The user confirms on the device screen.
+4. The device signs with the private key at the specified BIP-44 path and returns the signature.
+5. The CLI attaches the signature and broadcasts the transaction.
+
+### CLI Usage
+
+```bash
+# Use a Ledger device (default account 0)
+$ cowboy wallet address --ledger
+Address: 0x7a3b...f92e  (Ledger, m/44'/60'/0'/0/0)
+
+# Use a specific account index on the hardware wallet
+$ cowboy wallet address --ledger --account 2
+Address: 0x1d8e...c4f6  (Ledger, m/44'/60'/0'/0/2)
+
+# Deploy an actor, signing with Ledger
+$ cowboy actor deploy --code actors/hello/main.py --ledger
+Confirm on your Ledger device...
+✓ Actor deployed at 0xabcd...1234
+
+# Send a transaction with Trezor
+$ cowboy transfer --to 0x1234...5678 --amount 10 --trezor
+Confirm on your Trezor device...
+✓ Transfer sent (tx: 0xef01...7890)
+```
+
+### Supported Devices
+
+| Device | Connection | Library | Status |
+|--------|-----------|---------|--------|
+| Ledger Nano S/X/S Plus | USB HID | `ledger-transport-hid` | Planned |
+| Trezor Model T/One | USB HID | `trezor-transport` | Planned |
+
+Since Cowboy uses the standard Ethereum derivation path (`m/44'/60'/0'/0/n`) and secp256k1 signing, hardware wallets require no custom firmware or app — the existing Ethereum app on Ledger/Trezor works directly.
+
+### Auto-Discovery with Hardware Wallets
+
+When `--ledger` or `--trezor` is passed, the CLI skips file-based key discovery entirely and communicates with the device directly. Hardware wallet flags take priority over all other key sources.
+
+## Environment Variable Format
+
+When using the `COWBOY_PRIVATE_KEY` environment variable, the value is the raw 32-byte key in hex encoding (with or without `0x` prefix):
+
+```bash
+export COWBOY_PRIVATE_KEY=fd727f6b015a85fd4035a3106aa8e7178507d0af7c472334715862b4a7ad1866
+```
+
+Hex is the right choice for environment variables because:
+- It's a single-line value (no PEM headers)
+- It's commonly used for secrets in environment variables across the ecosystem
+- It's easy to set programmatically
+
+## CLI Commands
+
+Wallet commands:
+
+| Command | Description |
+|---------|-------------|
+| `cowboy wallet create` | Generate a new key in PEM format |
+| `cowboy wallet create --encrypt` | Generate a new key as encrypted keystore |
+| `cowboy wallet create --from-mnemonic` | Derive key from BIP-39 mnemonic via BIP-44 |
+| `cowboy wallet address` | Derive and print public address from private key |
+| `cowboy wallet address --ledger` | Print address from hardware wallet |
+| `cowboy wallet accounts --mnemonic` | List derived accounts from a mnemonic |
+| `cowboy wallet export --mnemonic` | Export key's mnemonic (if created from one) |
+| `cowboy wallet import --mnemonic` | Import key from BIP-39 mnemonic, write PEM file |
+| `cowboy wallet encrypt` | Encrypt an existing PEM key to `.cowboy/key.enc` |
+| `cowboy wallet decrypt` | Decrypt a keystore back to PEM |
+
+## Security Considerations
+
+<AccordionGroup>
+  <Accordion title="File Permissions" icon="shield">
+    The CLI MUST set `.cowboy/key` to mode `0600` (owner read/write only) on creation. On load, if the file is group- or world-readable, the CLI SHOULD print a warning:
+
+    ```
+    Warning: .cowboy/key is readable by others.
+    Run: chmod 600 .cowboy/key
+    ```
+  </Accordion>
+
+  <Accordion title="Mnemonic Handling" icon="eye-slash">
+    When displaying mnemonics, the CLI MUST:
+    - Print a warning about secure storage before showing the words.
+    - Never write mnemonics to log files or shell history.
+    - Clear terminal scrollback is recommended but not enforced.
+
+    When reading mnemonics for import, the CLI SHOULD use a no-echo input mode where supported.
+  </Accordion>
+
+  <Accordion title="Encryption at Rest" icon="lock">
+    Unencrypted PEM keys are protected by filesystem permissions (`0600`), which is sufficient for local development. For production or shared machines, use the [encrypted keystore](#encrypted-keystore) format (`cowboy wallet encrypt`), which wraps the key in AES-256-GCM with an Argon2id-derived passphrase.
+  </Accordion>
+
+  <Accordion title="Hardware Wallets" icon="usb">
+    Hardware wallets provide the strongest key security — the private key is generated on-device and never exposed to the host machine. For high-value accounts or production validators, hardware wallet signing is strongly recommended.
+  </Accordion>
+</AccordionGroup>
+
+## Encrypted Keystore
+
+For production deployments and shared machines, Cowboy supports passphrase-encrypted key files. An encrypted keystore wraps the PEM key material in an AES-256-GCM envelope, with the encryption key derived from a user passphrase via Argon2id.
+
+### File Format (`.cowboy/key.enc`)
+
+```json
+{
+  "version": 1,
+  "curve": "secp256k1",
+  "kdf": {
+    "algorithm": "argon2id",
+    "params": {
+      "m_cost": 65536,
+      "t_cost": 3,
+      "p_cost": 1
+    },
+    "salt": "base64-encoded-16-bytes"
+  },
+  "cipher": {
+    "algorithm": "aes-256-gcm",
+    "nonce": "base64-encoded-12-bytes",
+    "ciphertext": "base64-encoded-encrypted-key",
+    "tag": "base64-encoded-16-byte-auth-tag"
+  },
+  "checksum": "9a3b"
+}
+```
+
+### Encryption Specification
+
+<Steps>
+  <Step title="Key Derivation">
+    The passphrase is fed into **Argon2id** to derive a 32-byte encryption key:
+
+    | Parameter | Value | Rationale |
+    |-----------|-------|-----------|
+    | `m_cost` | 65536 (64 MiB) | Memory-hard; resists GPU/ASIC attacks |
+    | `t_cost` | 3 iterations | Balances security with ~1s unlock time on modern hardware |
+    | `p_cost` | 1 (single-threaded) | Deterministic timing; no parallelism variance |
+    | `salt` | 16 random bytes | Unique per keystore; prevents rainbow tables |
+
+    Argon2id is chosen over scrypt (used by Ethereum's keystore v3) because it provides stronger resistance to both GPU and side-channel attacks.
+  </Step>
+
+  <Step title="Encryption">
+    The raw 32-byte private key is encrypted with **AES-256-GCM**:
+
+    1. Generate a 12-byte random nonce.
+    2. Encrypt the key bytes with AES-256-GCM using the derived key and nonce.
+    3. Store the ciphertext and 16-byte authentication tag separately.
+
+    AES-256-GCM provides authenticated encryption — any tampering with the ciphertext, nonce, or tag causes decryption to fail.
+  </Step>
+
+  <Step title="Checksum">
+    The `checksum` field contains the same SHA-256-based checksum as the PEM format (first 4 hex chars of `SHA-256(raw_key_bytes)`). This allows verifying the key after decryption without exposing any information about the plaintext key in the encrypted file.
+
+    The checksum is computed over the **plaintext** key bytes before encryption and verified after decryption.
+  </Step>
+</Steps>
+
+### CLI Commands
+
+```bash
+# Encrypt an existing key (prompts for passphrase)
+$ cowboy wallet encrypt
+Enter passphrase: ********
+Confirm passphrase: ********
+Encrypted keystore written to .cowboy/key.enc
+Original key backed up to .cowboy/key.bak
+
+# Create a new wallet directly as encrypted
+$ cowboy wallet create --encrypt
+Enter passphrase: ********
+Confirm passphrase: ********
+Created wallet:
+  Keystore: .cowboy/key.enc
+  Curve:    secp256k1
+  Address:  0x7a3b...f92e
+
+# Decrypt back to PEM (prompts for passphrase)
+$ cowboy wallet decrypt
+Enter passphrase: ********
+Decrypted key written to .cowboy/key
+```
+
+### Auto-Discovery with Encrypted Keys
+
+The [key auto-discovery](/cli-specs/key-auto-discovery) order is extended to check for encrypted keystores:
+
+1. `--ledger` / `--trezor` flag (hardware wallet, skips file discovery)
+2. `--private-key <path>` flag
+3. `COWBOY_PRIVATE_KEY` environment variable (hex)
+4. `.cowboy/key` file (PEM)
+5. **`.cowboy/key.enc` file (encrypted keystore) — prompts for passphrase**
+
+When an encrypted keystore is found, the CLI prompts for a passphrase interactively. For non-interactive environments (CI/CD), the passphrase can be provided via the `COWBOY_KEY_PASSPHRASE` environment variable.
+
+### Passphrase Requirements
+
+The CLI enforces minimum passphrase quality on creation:
+
+- Minimum 8 characters
+- No maximum length
+- No character-class requirements (length is the primary security factor)
+
+Weak passphrases (under 12 characters) trigger a warning but are allowed:
+
+```
+Warning: Short passphrase. Consider using 12+ characters for production keys.
+```
+
+### When to Use Each Format
+
+| Scenario | Recommended Format |
+|----------|-------------------|
+| Local development (single user) | PEM (unencrypted) |
+| Shared development machine | Encrypted keystore |
+| CI/CD pipeline | Env var (`COWBOY_PRIVATE_KEY`) or secrets manager |
+| Production validator/runner | Hardware wallet or encrypted keystore |
+| Long-term backup | BIP-39 mnemonic (paper/metal) |
+| Managing multiple accounts | BIP-39 mnemonic + HD derivation |
+
+## Further Reading
+
+- [Key Auto-Discovery](/cli-specs/key-auto-discovery) — How the CLI finds keys
+- [cowboy wallet](/cli-specs/cowboy-wallet) — Wallet command reference
+- [Cowboy Design Decisions](/whitepaper/cowboy-design-decisions) — Cryptographic design rationale

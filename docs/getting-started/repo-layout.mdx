@@ -1,0 +1,251 @@
+---
+title: Source Layout
+description: Contributor guide to the full Cowboy source workspace
+icon: code-branch
+---
+
+## Introduction
+
+This page is for contributors working in the full Cowboy source workspace. App developers following the [Quickstart](/getting-started/quickstart) do **not** need these directories; they only need the `cowboy` CLI installed and a normal project directory.
+
+The full workspace contains the core blockchain, Python VM, off-chain runner network, distributed storage, and developer tooling. Depending on how you obtained the source, these components may be checked out as sibling repositories rather than as directories inside this documentation repo.
+
+## Top-Level Structure
+
+```
+cowboy/
+├── node/                 # L1 blockchain (Rust, 18+ crates)
+├── pvm/                  # Python VM (Rust, based on RustPython)
+├── runner/               # Off-chain compute network (Rust)
+├── cbfs/                 # Distributed encrypted storage (Rust)
+├── explorer/             # Block explorer frontend (HTML/JS)
+├── lasso/                # Interactive terminal console (Node.js/Ink)
+└── cowboy/               # Protocol documentation and examples
+```
+
+## Core Components
+
+### node — L1 Blockchain
+
+**Path**: `node/`
+
+A Rust workspace containing ~18 crates that make up the validator, CLI, indexer, and chain logic.
+
+<Tabs>
+  <Tab title="Consensus & Execution">
+    - `validator/` — Simplex BFT consensus node (~1s block time, ~2s finality)
+    - `chain/` — Block production, execution engine, RPC API
+    - `execution/` — Transaction execution pipeline
+    - `storage/` — Account, actor, and receipt persistence (QMDB-backed)
+  </Tab>
+
+  <Tab title="CLI & Client">
+    - `cli/` — The `cowboy` command-line binary
+    - `cowboy/` — CLI helper libraries
+    - `client/` — Rust SDK for embedding a Cowboy client
+    - `wallet/` — secp256k1 keypair management
+  </Tab>
+
+  <Tab title="Indexing & Inspection">
+    - `indexer/` — Stateless activity indexer daemon
+    - `inspector/` — Chain state inspection tool
+    - `rpc/` — JSON-RPC server
+  </Tab>
+
+  <Tab title="Protocol Features">
+    - `token/` — CIP-20 fungible token registry
+    - `ras/` — Role-based access system
+    - `proof-verifier/` — Merkle proof verification
+    - `types/` — Shared transaction and block types
+  </Tab>
+</Tabs>
+
+### pvm — Python Virtual Machine
+
+**Path**: `pvm/`
+
+A deterministic Python 3 interpreter in Rust (forked from RustPython), with blockchain-specific extensions.
+
+**Key features:**
+- **Checkpoint/resume** — Serialize and restore full program state mid-execution
+- **Fuel metering** — Deterministic cycle-level execution limits
+- **Rust ↔ Python interop** — Bidirectional function calls via `pvm_host`
+- **Soft float** — Software floating-point for bit-identical results across hardware
+
+**Notable subdirectories:**
+- `pvm/src/` — The Rust interpreter core
+- `pvm/Lib/` — Python standard library (curated, deterministic subset)
+- `pvm/Lib/cowboy_sdk/` — The **Cowboy Python SDK** (CIP-6): `@actor`, `runner.continuation`, `CowboyModel`, `capture`, `codec`, etc.
+
+### runner — Off-Chain Compute
+
+**Path**: `runner/`
+
+Decentralized network for verifiable off-chain computation (CIP-2). Runners execute jobs that actors request and submit signed results back on-chain.
+
+**Executor types:** LLM (OpenAI/Anthropic), HTTP, MCP (Model Context Protocol).
+
+**Verification models:** N-of-M consensus, TEE attestation, ZK proofs (v2).
+
+### cbfs — Distributed Storage
+
+**Path**: `cbfs/`
+
+Encrypted distributed filesystem with Reed-Solomon erasure coding, AES-256-GCM client-side encryption, QUIC transport, and a FUSE mount binary.
+
+**Key crates:**
+| Crate | Purpose |
+|-------|---------|
+| `cbfs-types` | Shared types: VolumeId, ShardId, NodeId |
+| `cbfs-crypto` | AES-256-GCM, BLAKE3, DEK wrapping |
+| `cbfs-erasure` | Reed-Solomon (K data + M parity, SIMD) |
+| `cbfs-manifest` | Client-side volume index with Merkle integrity |
+| `cbfs-auth` | Delegated identity, token minting, cache helpers |
+| `cbfs-store` | Sled-backed blob storage for storage nodes |
+| `cbfs-transport` | QUIC client/server with bincode RPC |
+| `cbfs-sdk` | High-level Volume API: `put`, `get`, `commit` |
+| `cbfs-node` | Storage node daemon |
+| `cbfs-fuse` | FUSE filesystem binary |
+
+### actors — Example Python Actors
+
+**Path**: `actors/`
+
+Reference actors you can deploy out of the box.
+
+- `actors/hello/main.py` — Minimal counter actor
+- `actors/feed-subscriber/main.py` — Subscribe to Watchtower (CIP-7) streams
+
+Additional worked examples live under `examples/` in the docs/source workspace:
+- `examples/core/05-tokens-and-balances/` — CIP-20 token workflows
+- `examples/gallery/advanced-messaging-ring/` — Multi-actor ring topology demo
+- `examples/core/08-minimal-runner-continuation/` — Runner continuation pattern
+- `examples/core/07-timers-and-automation/` — Timer scheduling pattern
+
+### lasso — Interactive Console
+
+**Path**: `lasso/`
+
+React/Ink-based terminal UI that wraps the `cowboy` CLI with session persistence, command history, and a live status bar. Useful for interactive debugging.
+
+### explorer — Block Explorer
+
+**Path**: `explorer/`
+
+Static HTML/JS + TailwindCSS block explorer — dashboard, blocks, transactions, actors, runner status. Serve with any static HTTP server.
+
+### docker — Local Dev Environment
+
+**Path**: `docker/`
+
+Docker Compose stacks for running a local validator + runner network in a contributor/source checkout. The public Quickstart uses the hosted devnet and does not require Docker.
+
+### aws-infrastructure — Production Deployment
+
+**Path**: `aws-infrastructure/`
+
+Terraform modules for AWS: VPC, EC2 validators/runners (ASG with spot), S3 artifacts, IAM, GitHub Actions CI/CD.
+
+## Finding Your Way Around
+
+<AccordionGroup>
+  <Accordion title="The Python VM interpreter" icon="microchip">
+    **Path**: `pvm/src/`
+
+    The Rust-based Python bytecode interpreter with fuel metering.
+  </Accordion>
+
+  <Accordion title="The Cowboy Python SDK (CIP-6)" icon="python">
+    **Path**: `pvm/Lib/cowboy_sdk/`
+
+    The `@actor` decorator, continuation FSM compiler, storage/runtime APIs, and CBOR codec.
+  </Accordion>
+
+  <Accordion title="Gas metering logic" icon="gauge">
+    **Path**: `node/execution/` and `pvm/src/` (fuel hooks)
+
+    Cycles metering in the VM; Cells metering at I/O boundaries.
+  </Accordion>
+
+  <Accordion title="Off-chain runner" icon="server">
+    **Path**: `runner/src/` and `runner/crates/`
+
+    Executors for LLM, HTTP, MCP. See `runner/README.md` for the on-chain system actor addresses.
+  </Accordion>
+
+  <Accordion title="CBFS filesystem" icon="hard-drive">
+    **Path**: `cbfs/fuse/`, `cbfs/store/`, `cbfs/sdk/`
+
+    FUSE mount binary, node daemon, and volume SDK.
+  </Accordion>
+
+  <Accordion title="The CLI binary" icon="terminal">
+    **Path**: `node/cli/`
+
+    Built as `cargo build --release --bin cowboy` from the `node/` workspace.
+  </Accordion>
+
+  <Accordion title="Example actors" icon="code">
+    **Paths**: `actors/` and `examples/`
+
+    Ready-to-deploy reference actors and worked end-to-end demos.
+  </Accordion>
+
+  <Accordion title="Protocol specs (CIPs)" icon="file-lines">
+    **Path**: `cowboy/docs/cips/`
+
+    Formal CIP (Cowboy Improvement Proposal) documents.
+  </Accordion>
+</AccordionGroup>
+
+## Contributing Areas
+
+<CardGroup cols={2}>
+  <Card title="Core Protocol" icon="code">
+    **Language**: Rust
+
+    **Areas**: consensus, execution, storage, networking
+
+    **Paths**: `node/`, `pvm/`
+  </Card>
+
+  <Card title="Off-Chain Runner" icon="server">
+    **Language**: Rust
+
+    **Areas**: executors (LLM/HTTP/MCP), verification, registry
+
+    **Path**: `runner/`
+  </Card>
+
+  <Card title="CBFS Storage" icon="hard-drive">
+    **Language**: Rust
+
+    **Areas**: erasure coding, auth, FUSE, transport
+
+    **Path**: `cbfs/`
+  </Card>
+
+  <Card title="Python SDK" icon="python">
+    **Language**: Python
+
+    **Areas**: `@actor` decorator, continuation FSM, codec
+
+    **Path**: `pvm/Lib/cowboy_sdk/`
+  </Card>
+
+  <Card title="Tooling" icon="wrench">
+    **Language**: Mixed
+
+    **Areas**: CLI, Lasso console, explorer UI
+
+    **Paths**: `node/cli/`, `lasso/`, `explorer/`
+  </Card>
+
+  <Card title="Documentation" icon="book">
+    **Language**: Markdown (MDX)
+
+    **Areas**: guides, architecture, CIPs
+
+    **Path**: `cowboy/docs/`
+  </Card>
+</CardGroup>

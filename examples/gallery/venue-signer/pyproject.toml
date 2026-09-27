@@ -1,0 +1,17 @@
+[project]
+name = "venue-signer"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+# The only group that enters the image. hyperliquid-python-sdk brings
+# eth-account (secp256k1 + EIP-712) and msgpack (the action hash); its
+# Exchange/Info clients are never imported here, only utils.signing.
+offchain = ["hyperliquid-python-sdk==0.24.0"]
+test = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["offchain/tests"]
+addopts = ["--import-mode=importlib"]
+pythonpath = ["offchain"]

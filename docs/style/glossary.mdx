@@ -1,0 +1,165 @@
+---
+title: Glossary
+description: Official terminology for the Cowboy protocol
+icon: pen-to-square
+---
+
+## Introduction
+
+This glossary defines official terminology used throughout Cowboy documentation. Use these terms consistently when contributing documentation or writing about Cowboy.
+
+<Tip>
+  **Canonical Reference**: This glossary is the authoritative source for Cowboy terminology.
+</Tip>
+
+---
+
+## Core Concepts
+
+### Actor
+
+**Definition**: A stateful program that processes messages and stores data on-chain. The fundamental compute unit in Cowboy.
+
+**Related**: Handler, Message
+
+---
+
+### Handler
+
+**Definition**: A Python method within an Actor that processes incoming messages.
+
+**Related**: Actor, Message
+
+---
+
+### Message
+
+**Definition**: The unit of communication between Actors or from users to Actors (external, internal, or callback).
+
+**Related**: Actor, Handler
+
+---
+
+## Gas & Fees
+
+### Cycles
+
+**Definition**: Compute metering unit; every bytecode instruction consumes Cycles.
+
+---
+
+### Cells
+
+**Definition**: Data/storage metering unit; 1 Cell = 1 byte.
+
+---
+
+### Basefee
+
+**Definition**: Algorithmic minimum fee per Cycle or Cell (dual EIP-1559 style).
+
+---
+
+### Tip
+
+**Definition**: Priority fee paid to block proposer; determines inclusion priority.
+
+---
+
+## Timers & Scheduling
+
+### Timer
+
+**Definition**: Scheduled execution of an Actor handler at a future block; set via `set_timeout(...)`.
+
+---
+
+### Scheduler
+
+**Definition**: Protocol component managing timer queues and executing expired timers under a per-block budget.
+
+---
+
+### GBA (Gas Bidding Agent)
+
+**Definition**: Contract designated by the Actor to return dynamic fee bids for timer execution, given protocol-supplied context.
+
+---
+
+## Off-Chain Compute
+
+### Runner
+
+**Definition**: Off-chain compute node that executes tasks and submits results on-chain.
+
+---
+
+### Task
+
+**Definition**: Off-chain computation request with a definition and result schema.
+
+---
+
+### Dispatcher
+
+**Definition**: On-chain contract managing task submission and result consumption.
+
+---
+
+### Callback
+
+**Definition**: Message delivering results back to the Actor; the Actor finalizes via `consume_result()`.
+
+---
+
+## Consensus
+
+### Validator
+
+**Definition**: Node that participates in consensus, proposes blocks, and validates state transitions.
+
+---
+
+### Consensus
+
+**Definition**: BFT-style Proof-of-Stake (Simplex-based) agreement on the canonical chain.
+
+---
+
+### Finality
+
+**Definition**: Point at which a transaction becomes irreversible (fast finality; exact parameters governance-defined).
+
+---
+
+## Economics
+
+### CBY
+
+**Definition**: Native token used to pay fees, stake, and compensate Runners.
+
+---
+
+### Burn
+
+**Definition**: Permanent removal of CBY (e.g., basefee burn).
+
+---
+
+<Info>
+  This v0.1 glossary intentionally focuses on core terms to reduce cognitive load. Additional entries will return in later milestones.
+</Info>
+
+---
+
+## Contributing to Glossary
+
+**To Add Term**:
+1. Check it's not already defined
+2. Follow format: Definition → Characteristics → Example → Related terms
+3. Submit PR to `docs/style/glossary.mdx`
+
+**To Request Clarification**:
+- Open issue on GitHub
+- Ask in Discord 
+

@@ -1,0 +1,310 @@
+---
+title: Design Principles
+description: Core principles guiding Cowboy's architecture and implementation
+icon: list
+---
+
+## Introduction
+
+Cowboy was designed from first principles to enable **autonomous agents** and **verifiable computation** on a blockchain. Every architectural decision flows from a set of core principles that prioritize **usability**, **security**, **fairness**, and **composability**.
+
+<Tip>
+  **These principles are not just philosophy**—they directly shaped concrete technical choices throughout the protocol.
+</Tip>
+
+> Note: Examples on this page are conceptual snippets for understanding. Final interfaces and usage should follow the SDK and Developer Guide.
+
+## 1. Developer Experience First
+
+**Principle**: Make blockchain development accessible to mainstream developers, especially those building AI agents.
+
+### Why Python?
+
+**Traditional blockchain**: Learn chain-specific languages
+
+**Cowboy**: Use Python (widely adopted in AI/ML ecosystems)
+
+**Impact**:
+- Lower barrier to entry
+- Reuse existing Python skills
+- Access to Python ecosystem patterns
+- Natural fit for AI/ML logic
+
+**Trade-offs we accepted**:
+- Slower execution (vs compiled languages)
+- More complex VM implementation
+- Determinism constraints (no standard library I/O)
+
+**Why we think it's worth it**: Developer productivity >>> execution speed for most applications. Hardware is cheap, developer time is expensive.
+
+---
+
+## 2. Fair Resource Pricing
+
+**Principle**: Different resources should have different prices. Users shouldn't subsidize each other's costs.
+
+### Dual-Metered Gas System
+
+**Traditional blockchain**: Single "gas" metric for everything
+
+**Problem**: Compute and storage have different costs
+- CPU cycles: expensive during execution, free after
+- Storage: cheap initially, expensive ongoing (stored forever)
+
+**Cowboy**: Separate Cycles (compute) and Cells (data/storage)
+
+Cowboy separates compute (Cycles) and data/storage (Cells) so each pays for what they use.
+
+**Impact**:
+- Fair pricing: compute-heavy apps don't subsidize storage-heavy apps
+- Independent markets: each resource has its own supply/demand dynamics
+- Predictable costs: developers know exactly what they're paying for
+
+**See**: [Fee Model](/architecture/fees/overview)
+
+---
+
+## 3. Determinism Above All
+
+**Principle**: All nodes must produce identical results. Non-determinism breaks consensus.
+
+### Strict Determinism Requirements
+
+**Challenge**: Python is inherently non-deterministic
+- System time varies
+- Random varies
+- Dictionary ordering can vary
+- Floating-point hardware varies
+
+**Solution**: Eliminate all sources of non-determinism
+
+Key requirements include avoiding non-deterministic sources (e.g., local time, local randomness, I/O) and using protocol-provided deterministic context and APIs (e.g., block metadata, VRF-based randomness, storage APIs, and CIP-2 off-chain framework).
+
+**Impact**:
+- Guaranteed consensus (no forks from non-determinism)
+- Predictable behavior (same input → same output, always)
+- Testable (local tests match on-chain behavior exactly)
+
+**Trade-offs**:
+- Some Python features unavailable
+- Slower execution (software FPU, no JIT)
+- Developer constraints (must use protocol APIs)
+
+**Why we think it's worth it**: Consensus failure is catastrophic. Constraints are acceptable price for correctness.
+
+**See**: [Determinism & Sandboxing](/architecture/actor-vm/determinism-and-sandbox)
+
+---
+
+## 4. Native Autonomy
+
+**Principle**: Agents should execute autonomously without external infrastructure.
+
+### Built-In Timer System
+
+**Traditional blockchain**: Rely on external services (Gelato, Chainlink Automation)
+
+**Problems**:
+- Additional dependency
+- Trust assumptions
+- Extra costs
+- Integration complexity
+
+**Cowboy**: Timers as protocol feature (CIP-1)
+
+Timers are a protocol feature (CIP-1) with a tiered calendar queue and a Gas Bidding Agent (GBA) model for prioritized execution within a per-block budget.
+
+**Impact**:
+- True autonomy: agents self-execute
+- No external dependencies
+- Fair scheduling: economic priority (gas bidding)
+- Guaranteed execution: protocol-level
+
+**See**: [Scheduler Overview](/architecture/scheduler/overview)
+
+---
+
+## 5. Verifiable Off-Chain Execution
+
+**Principle**: Heavy computation should happen off-chain, but remain verifiable and decentralized.
+
+### Native Off-Chain Compute Framework
+
+**Challenge**: On-chain execution is expensive and limited
+- AI models are too large
+- API calls need network access
+- Heavy computation exceeds gas limits
+
+**Traditional solutions**:
+- Oracles (centralized, trust-based)
+- State channels (complex, limited use cases)
+- Optimistic rollups (still EVM-limited)
+
+**Cowboy**: Native verifiable off-chain compute (CIP-2)
+
+- Submit task to the Dispatcher (with mandatory result_schema; CIP-2)
+- Deterministically select candidate runners via VRF logic
+- Runner executes or skips; submits results and optional proofs on-chain
+- When N results are collected, trigger deferred callback; actor consumes and finalizes payment
+
+**Key Design Choices**:
+
+1. **VRF-Based Selection**: No central coordinator; deterministic, verifiable selection.
+
+2. **Configurable Verification**: Proof requirements are specified by developers within the CIP-2 framework.
+
+3. **Market-Based Pricing**: The protocol does not mandate a price; participants discover prices off-chain.
+
+**Impact**:
+- Off-chain execution with on-chain verifiability
+- Decentralized selection and submission
+- Configurable verification requirements (per CIP-2)
+
+**See**: [Off-Chain Compute](/architecture/offchain/overview)
+
+---
+
+## 6. Economic Incentive Alignment
+
+**Principle**: Protocol economics should align incentives for all participants.
+
+### Multi-Stakeholder Incentives
+
+Stakeholders may benefit differently from core mechanisms (dual metering, basefee burn, priority tips, and off-chain markets). Specific reward, penalty, or governance mechanics are implementation-dependent and not specified here.
+
+### Fee Burn Mechanism (Dual EIP-1559)
+
+Every transaction pays basefee (burned) and optional tips to the block producer across both resources (Cycles and Cells). Pricing dynamics follow CIP-3.
+
+---
+
+## 7. Security by Default
+
+**Principle**: Make the secure path the easy path. Make mistakes hard.
+
+### Secure Defaults
+
+Secure defaults include: sandboxed execution, enforced resource limits, and isolated processing per transaction.
+
+### Security Patterns
+
+Security patterns are documented alongside determinism constraints and scheduler budget/priority rules in CIP-1 and CIP-3.
+
+---
+
+## 8. Composability
+
+**Principle**: Actors should easily interact with each other to create complex systems.
+
+### Message-Based Architecture
+
+Message-based interactions are asynchronous and handler-oriented; exact APIs are defined by the SDK and normative CIPs.
+
+**Design Choices**:
+- Asynchronous messaging (non-blocking)
+- Explicit handler calls (clear interface)
+- Address-based routing (simple)
+ 
+
+**Composability Patterns**:
+1. **Actor calls Actor**: Direct messaging
+2. **Actor publishes event**: Subscription pattern
+3. **Actor delegates to Actor**: Proxy pattern
+4. **Actors coordinate**: Multi-party protocols
+
+---
+
+## 9. Progressive Complexity (Conceptual)
+
+**Principle**: Simple things should be simple. Complex things should be possible.
+
+### Layered Abstractions
+
+Progressive complexity spans from simple stateful actors to timer-driven systems and off-chain integrations (CIP-1 / CIP-2).
+
+**Principle in Action**:
+- Beginners can build useful things immediately
+- Experts can leverage full power
+- Gradual learning curve
+
+---
+
+## 10. Transparency and Openness (Scope)
+
+**Principle**: Everything should be observable, auditable, and open source.
+
+Transparency focuses on documentation quality, explicit metering rules (CIP-3), and clear normative specifications (CIPs). Governance and licensing specifics are out of scope here.
+
+---
+
+## Principles in Practice (Illustrative)
+
+### Example: Timer Implementation (Conceptual)
+
+The timer system (CIP-1) applies these principles via protocol-native scheduling, economic prioritization (GBA bidding), and bounded per-block processing.
+
+---
+
+## Trade-offs We Made (High-level)
+
+**Principle: Be honest about compromises**
+
+Trade-offs include: using a Python VM for developer familiarity, software floating-point and no JIT for determinism, dual metering for fair pricing, and BFT-style consensus for fast finality. Exact performance numbers or validator set sizes are outside the scope of this document.
+
+---
+
+## Measuring Success (Non-normative)
+
+**How do we know if these principles work?**
+
+Potential indicators include developer adoption, application diversity, cost predictability, and security posture. These are non-normative and illustrative.
+
+---
+
+## Principles for the Future (Non-normative)
+
+**As Cowboy evolves, we'll continue to**:
+
+1. **Prioritize developer experience**
+   - Better tools, clearer docs
+   - More examples, less boilerplate
+
+2. **Maintain correctness**
+   - Determinism always
+   - Security by design
+
+3. **Evolve thoughtfully**
+   - Backward compatibility where possible
+   - Clear migration paths when breaking
+
+4. **Stay open**
+   - Community governance
+   - Transparent decision-making
+   - Public roadmap
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture Overview" icon="sitemap" href="/overview/architecture">
+    See how principles became architecture
+  </Card>
+  
+  <Card title="What is Cowboy" icon="bars-staggered" href="/introduction/what-is-cowboy">
+    Return to the protocol overview
+  </Card>
+  
+  <Card title="Quickstart" icon="rocket" href="/getting-started/quickstart">
+    Experience the principles in action
+  </Card>
+  
+  <Card title="Contributing" icon="code-pull-request" href="/contributing/how-to-propose">
+    Help shape Cowboy's future
+  </Card>
+</CardGroup>
+
+## Further Reading
+
+- [What is Cowboy?](/introduction/what-is-cowboy)
+- [Reader Paths](/introduction/reader-paths)

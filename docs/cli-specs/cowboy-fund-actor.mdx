@@ -1,0 +1,41 @@
+---
+title: "cowboy fund-actor"
+description: Fund an actor's balance so it can pay its own gas
+icon: coins
+---
+
+## Synopsis
+
+```bash
+cowboy fund-actor --actor <address> --amount <cby> [flags]
+```
+
+## Behavior
+
+1. Load the private key using [key auto-discovery](/cli-specs/key-auto-discovery).
+2. Submit a transfer from the sender to the actor address.
+3. Print the transaction hash and the actor's new balance.
+
+Funded actors can pay gas for handlers that don't receive a caller-paid message — for example, actors driven by the scheduler (CIP-1 timers) or off-chain runner callbacks.
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--actor` | Required | Target actor address (hex) |
+| `--amount` | Required | Amount in CBY (1 CBY = 10⁹ wei) |
+| `--private-key` | Auto-discovered | Sender's private key |
+| `--rpc-url` | Auto-discovered | RPC endpoint |
+
+## Example
+
+```bash
+$ cowboy fund-actor --actor 0xdef456... --amount 10
+Transaction: 0xabc123...
+  Actor 0xdef456... balance: 10 CBY
+```
+
+## Edge Cases
+
+- **Insufficient sender balance** — The transaction reverts at execution. The receipt contains `InsufficientFunds`.
+- **Unknown actor** — Funding a non-existent address succeeds (balance is tracked at the address level, not per-actor). If the address is eventually deployed to, the funds will be available.

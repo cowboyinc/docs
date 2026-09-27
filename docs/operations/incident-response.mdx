@@ -1,0 +1,102 @@
+---
+title: "Incident Response"
+description: "Symptom-driven runbook for a Cowboy validator — health surfaces, a decision tree for degraded / halted / stalled nodes, and how to restart safely without wiping state."
+---
+
+This runbook is symptom-driven: start from what you observe on the health
+surfaces, follow the decision tree, and restart safely. It assumes a
+production deployment managed by systemd / an orchestrator — **not** the local
+devnet scripts (see the [restart warning](#restart-safely)).
+
+## Health surfaces
+
+| Endpoint | Returns | Use |
+|---|---|---|
+| `GET /health` | `{"status":"ok"}` | Load-balancer liveness probe (no state read) |
+| `GET /health/detailed` *(alias `/health/ready`)* | `status`, `version`, `uptime_seconds`, `block_height`, `last_block_timestamp`, `mempool_transaction_count`, `mempool_account_count`, per-component status (`storage` / `mempool` / `rpc`) | Operator triage |
+| `GET /metrics` | Prometheus text | Dashboards + alerting |
+
+Key fields on `/health/detailed`:
+
+- **`block_height`** — latest finalized height. Compare against a healthy peer
+  to detect lag.
+- **`last_block_timestamp`** — Unix time of the latest finalized block. A
+  growing gap between this and *now* means the node is **stalled** (not
+  finalizing).
+- **`mempool_transaction_count`** — the top-level `status` flips to
+  `"degraded"` (and the `mempool` component to `"degraded"`) at **≥ 30,000**
+  pending transactions.
+- <a id="sync-lag" />**`synced`** — currently **hard-coded `true`**; it is *not*
+  a real sync flag. Judge sync state from `block_height` vs a peer and the
+  `last_block_timestamp` gap, not from this field.
+
+## Decision tree
+
+### Symptom: height not advancing (stalled)
+
+`last_block_timestamp` is minutes old and `block_height` is flat.
+
+1. Check `GET /health/detailed` on the other validators. If **they** are
+   advancing, this node is partitioned or behind — go to *lagging height*.
+2. If **no** validator is advancing, consensus has stalled network-wide
+   (insufficient online stake to certify). Recover quorum: bring offline
+   validators back; the protocol resumes automatically once enough are live
+   (view-change retries every `NULLIFY_RETRY` = 10 s).
+3. Check `/metrics` and logs for the failing component (storage errors, panics).
+
+Relevant compiled-in consensus timeouts (`node/validator/src/main.rs`, not
+runtime-configurable): leader timeout **1 s**, certification timeout **2 s**,
+nullify/view-change retry **10 s**, peer-fetch timeout **2 s**.
+
+### Symptom: lagging height (behind the tip)
+
+`block_height` is well below peers but `last_block_timestamp` is recent-ish.
+
+1. The node is catching up via [fast-sync](/operations/snapshots-and-restore#fast-sync-rebuild-from-a-peer);
+   watch `block_height` climb. Syncing nodes get a 10× longer activity timeout,
+   so they are not dropped mid-catch-up.
+2. If height is **not** climbing, check connectivity to `bootstrappers` /
+   peers and that a peer actually serves `/state/snapshot` (a peer with no
+   snapshot returns 404).
+
+### Symptom: mempool growth / degraded
+
+`status: "degraded"`, `mempool_transaction_count` near or above 30,000.
+
+1. Confirm blocks are still finalizing (`block_height` advancing). If yes, this
+   is **load**, not a fault — the backlog drains as blocks include txs.
+2. If height is flat *and* mempool is growing, the node is stalled — treat as
+   *height not advancing* above; the backlog is a symptom, not the cause.
+
+### Symptom: component unhealthy
+
+`/health/detailed` `components.storage` (or `rpc`) reports non-healthy, or
+`/health` itself fails.
+
+1. Pull logs and `/metrics`. Storage faults (disk full, QMDB I/O) usually need
+   the node stopped and the disk / state directory inspected.
+2. If state is corrupt, restore from backup or re-fast-sync — see
+   [Snapshots & Restore](/operations/snapshots-and-restore).
+
+## Restart safely
+
+<Warning id="restart-safely">
+**Do not run `scripts/restart_validator.sh` in production.** It is a
+local-devnet helper that **deletes state** — it `rm -rf`s `test/*.db`,
+`test/*.log`, and `test/storage` before restarting. On a real node that wipes
+the validator's database.
+</Warning>
+
+In production, restart through your service manager, which stops and starts the
+binary **without touching `directory`**:
+
+```bash
+sudo systemctl restart cowboy-validator
+# verify it came back and is finalizing:
+curl -s http://localhost:<rpc_port>/health/detailed | jq '.block_height, .last_block_timestamp'
+```
+
+A clean restart resumes from the persisted height and re-joins consensus; if the
+node fell behind while down, it fast-syncs the gap. Only delete `directory` when
+you *intend* a full resync from genesis or a peer — never as a routine restart
+step.

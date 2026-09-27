@@ -1,0 +1,44 @@
+---
+title: "E1226 — Target mailbox is full"
+description: "Target mailbox is full"
+---
+
+# E1226 — Target mailbox is full
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1226` |
+| **Slug** | `E1226` |
+| **Category** | `runtime` (Runtime) |
+
+
+## What happened
+
+Target mailbox is full.
+
+## Why it happened
+
+The target actor's mailbox has reached its maximum capacity (1,000 messages).
+
+## How to fix
+
+Drain the mailbox or reduce the send rate.
+
+## Receipt example
+
+```json
+{
+  "code": 1226,
+  "slug": "E1226",
+  "category": "runtime",
+  "what": "Target mailbox is full",
+  "fix": "Drain the mailbox or reduce the send rate.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1226"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

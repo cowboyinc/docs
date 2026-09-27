@@ -1,0 +1,133 @@
+---
+title: Off-Chain Task Lifecycle
+description: Complete workflow from task submission to payment distribution
+---
+
+## Introduction
+
+This document provides a detailed walkthrough of an off-chain task's complete lifecycle, from initial submission by an actor through execution by runners to final payment distribution.
+
+<Tip>
+  **Timeline**: Completion time varies with task complexity, verification mode, and network conditions.
+</Tip>
+
+> Note: Descriptions are principle-level (non‑normative). Final interfaces and usage should follow the SDK and Developer Guide; normative behavior follows the Off‑chain architecture and related CIPs (primarily CIP‑2, with deferred execution per CIP‑1).
+
+## Complete Lifecycle (Conceptual)
+
+- Task Submission (Block N): Actor submits a task with mandatory `result_schema`, payment is locked, and snapshots of VRF seed and active runner list are recorded; an event is emitted for runner detection.
+- Runner Detection (Block N): Runners independently determine selection using the VRF snapshot and active list at submission.
+- Off-Chain Execution (Blocks N+Δ): Selected runners execute off-chain, optionally producing proofs/attestations.
+- Result Submission (Blocks N+Δ): Selected runners submit results on-chain; submissions are validated (selection, size/format per `result_schema`, proof/attestation if requested) and stored.
+- Deferred Callback Trigger (Blocks N+Δ): Upon collecting N valid results, a deferred transaction is created and scheduled via the scheduler (CIP‑1) to invoke the actor’s callback with aggregated results.
+- Callback Execution (Blocks N+Δ): The actor’s callback evaluates results and selects the consumed result; the actor calls `consume_result(task_id, consumed_runner_address)` on the Dispatcher to finalize.
+- Payment Distribution (Same block): Dispatcher distributes payment to the consumed runner(s) and refunds any unused portion to the actor; task is finalized.
+
+## Phase-by-Phase Breakdown
+
+### Phase 1: Task Submission
+
+Actor responsibilities (conceptual):
+- Define task and mandatory `result_schema` (size/format bounds)
+- Specify callback handler, `num_runners`, `timeout_blocks`, and `proof_type_requested`
+- Persist task ID for tracking in application state
+
+On-chain effects (conceptual):
+- Lock funds and snapshot VRF seed and active runner list
+- Persist task record with submission/timeout blocks
+- Emit submission event for runner detection
+
+### Phase 2: Runner Detection & Selection
+
+Runners (conceptual):
+- Monitor submission events; compute selection from VRF seed snapshot and the active list at submission time (CIP‑2)
+- If selected and willing, execute; otherwise promptly call `skip_task` to advance selection
+
+### Phase 3: Off-Chain Execution
+
+Execution (conceptual):
+- Prepare inputs → run computation → (optional) produce proof/attestation → submit result
+- Track execution metrics locally for runner‑side pricing/acceptance heuristics (off‑chain concern)
+
+### Phase 4: Result Submission
+
+Submission checks (conceptual):
+- Verify runner selection and prevent duplicates
+- Validate result payload against `result_schema` (size/format)
+- Verify requested proof/attestation
+- Store result and update task state; when N results collected, schedule deferred callback
+
+### Phase 5: Deferred Callback Trigger
+
+Deferred callback (conceptual):
+- Construct a deferred transaction targeting the actor’s callback handler and schedule it under scheduler budget (CIP‑1)
+
+Why deferred:
+- Non‑blocking: Result submission isn’t stalled by callback execution
+- Separate metering: Callback is metered independently
+- Predictable scheduling: Executed under a fixed per‑block scheduler budget
+- Deterministic inclusion: Scheduler handles inclusion based on its rules
+
+### Phase 6: Callback Execution
+
+Actor callback responsibilities (conceptual):
+- Receive aggregated results
+- Determine acceptance (e.g., quorum for N‑of‑M) according to application logic
+- Call `consume_result(task_id, consumed_runner_address)` on the Dispatcher to finalize payment
+
+On‑chain effects (conceptual):
+- Success/failure of the callback is recorded; application state is updated accordingly
+
+### Phase 7: Payment Distribution
+
+Dispatcher (conceptual):
+- Verify authorization, task status, and consumed result
+- Pay the selected runner(s); refund any unused payment to the actor per task configuration
+- Mark task as finalized and emit finalization event
+
+## Alternative Paths
+
+### Timeout
+
+- If N results are not collected by `timeout_blocks`, the task is finalized as timed out (CIP‑2)
+- Late submissions are invalid; the actor/application may resubmit or adjust parameters for a new task
+
+### Runner Skip
+
+- If a selected runner cannot or will not execute, it SHOULD call `skip_task(task_id)` to advance selection to the next runner per deterministic order
+
+## Monitoring & Events (Conceptual)
+
+Actors and observers can track task progress via:
+- Task fields: status (e.g., PENDING, COMPLETED, FINALIZED, TIMEOUT), submission/timeout blocks, selected/submitted/skipped runners, number of results submitted vs. requested
+- Events: TaskSubmitted, ResultSubmitted, CallbackScheduled, CallbackExecuted/Failed, TaskFinalized
+
+## Best Practices (Principle‑Level)
+
+- Set `timeout_blocks` appropriate to expected off‑chain duration and verification mode
+- Choose `num_runners` and `proof_type_requested` to balance reliability, cost, and security
+- Validate result structures against `result_schema` strictly; ignore outliers for quorum modes
+- Encourage runners to `skip_task` quickly when they cannot execute to reduce overall latency
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Off-Chain Overview" icon="server" href="/architecture/offchain/overview">
+    High-level introduction to off-chain compute
+  </Card>
+  <Card title="Callback & Timeout" icon="clock" href="/architecture/offchain/callback-timeout-challenge">
+    Handling edge cases and failures
+  </Card>
+  <Card title="CIP-2 Specification" icon="file-lines" href="/cips/cip-2-offchain-compute">
+    Complete formal specification
+  </Card>
+  <Card title="Developer Examples" icon="code" href="/developers/examples">
+    Real-world integration examples
+  </Card>
+</CardGroup>
+
+## Further Reading
+
+- [CIP-2: Verifiable Off-Chain Compute Framework](/cips/cip-2-offchain-compute)
+- [Runner Economics](/economics/flows#off-chain-compute-flow-cip2)
+- [VRF-Based Selection](/cips/cip-2-offchain-compute#5-verifiable-runner-selection-fisher-yates-vrf)

@@ -1,0 +1,44 @@
+---
+title: "E1401 — Token not found"
+description: "Token not found"
+---
+
+# E1401 — Token not found
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1401` |
+| **Slug** | `E1401` |
+| **Category** | `token` (Token (CIP-20)) |
+| **CIP** | CIP-20 |
+
+## What happened
+
+Token not found.
+
+## Why it happened
+
+The referenced `token_id` does not correspond to any deployed token.
+
+## How to fix
+
+Deploy the token or use a valid token address.
+
+## Receipt example
+
+```json
+{
+  "code": 1401,
+  "slug": "E1401",
+  "category": "token",
+  "what": "Token not found",
+  "fix": "Deploy the token or use a valid token address.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1401"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

@@ -1,0 +1,44 @@
+---
+title: "E1001 — Invalid transaction signature"
+description: "Invalid transaction signature"
+---
+
+# E1001 — Invalid transaction signature
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1001` |
+| **Slug** | `E1001` |
+| **Category** | `validation` (Validation) |
+
+
+## What happened
+
+Invalid transaction signature.
+
+## Why it happened
+
+The transaction signature does not match the sender's public key. This usually means the transaction was signed with the wrong private key or the key has been rotated.
+
+## How to fix
+
+Re-sign the transaction with the account's current private key.
+
+## Receipt example
+
+```json
+{
+  "code": 1001,
+  "slug": "E1001",
+  "category": "validation",
+  "what": "Invalid transaction signature",
+  "fix": "Re-sign the transaction with the account's current private key.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1001"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

@@ -1,0 +1,70 @@
+---
+title: "Transaction Fields"
+description: "Field descriptions of Cowboy transactions"
+---
+
+## Introduction
+
+This page lists the canonical fields of a user-submitted transaction and their semantics, aligning with the Cowboy whitepaper and CIPs.
+
+<Tip>
+  Cowboy implements dual metering (Cycles and Cells) with independent EIP‑1559‑style fee markets; users set per‑meter limits and max fee/tip parameters.
+</Tip>
+
+## Canonical Fields
+
+- nonce (u64)
+  - Monotonically increasing per-sender counter. Prevents replay and enforces ordering. The state transition function validates signature, nonce, and balance before execution (whitepaper).
+
+- to (address, 20 bytes)
+  - Target account. If the target is an EOA, the transaction performs a native transfer; if the target is an actor, the transaction invokes the actor’s handler.
+
+- value (u128, CBY)
+  - Amount of native asset to transfer to `to`. For actor calls that do not transfer funds, this is 0.
+
+- payload (bytes)
+  - Call data delivered to the target actor’s handler. The byte length is metered as Cells before VM execution begins (CIP‑3: intrinsic calldata metering).
+
+- cycles_limit (u64)
+  - Upper bound on computational work allowed for this transaction. The VM halts with “Out of Cycles” if exceeded. Standardized and enforced to mitigate DoS (CIP‑3).
+
+- cells_limit (u64)
+  - Upper bound on bytes that may be consumed by data events (payload, return data, storage I/O, /tmp I/O). Standardized and enforced to mitigate DoS (CIP‑3).
+
+- max_fee_per_cycle (u128)
+  - Maximum price the sender is willing to pay per Cycle. Together with basefee_cycle determines the effective payment (CIP‑3).
+
+- max_fee_per_cell (u128)
+  - Maximum price the sender is willing to pay per Cell. Together with basefee_cell determines the effective payment (CIP‑3).
+
+- tip_per_cycle (u128)
+  - Optional tip to block producers, per Cycle. The effective tip paid is min(tip_per_cycle, max_fee_per_cycle − basefee_cycle) (CIP‑3).
+
+- tip_per_cell (u128)
+  - Optional tip to block producers, per Cell. The effective tip paid is min(tip_per_cell, max_fee_per_cell − basefee_cell) (CIP‑3).
+
+- signature (secp256k1)
+  - Signature over the transaction’s signing payload. The sender address is recovered from the signature (whitepaper: EOAs controlled by secp256k1 keys).
+
+## Validation and Execution (Informative)
+
+- Validation: The protocol validates signature, nonce, and balance. Transactions that fail validation are rejected (whitepaper).
+- Dispatch: The transaction is dispatched to `to` (EOA transfer or actor handler invocation) and enforced under all resource limits (whitepaper).
+- Metering and fees (CIP‑3):
+  - Cycles: Computation is metered at Python bytecode/host-call granularity.
+  - Cells: Bytes are charged at I/O boundaries (intrinsic calldata, storage I/O, /tmp I/O, return data).
+  - Basefee is independently adjusted for Cycles and Cells (dual EIP‑1559). The basefee portion of fees is burned; tips are paid to the producer.
+
+## Notes
+
+- Idempotency is achieved through nonce semantics and single inclusion in canonical block order; see Idempotency.
+- Reentrancy is prevented by the actor model’s single-threaded, sequential mailbox processing and deterministic async scheduling; see Reentrancy.
+
+## Further Reading
+
+- [Idempotency](/architecture/tx/idempotency)
+- [Reentrancy](/architecture/tx/reentrancy)
+- [Fee Model Overview](/architecture/fees/overview)
+- [CIP-3](/cips/cip-3-fee-model)
+
+

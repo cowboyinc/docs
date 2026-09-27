@@ -1,0 +1,44 @@
+---
+title: "E1515 — No commitment found for this runner"
+description: "No commitment found for this runner"
+---
+
+# E1515 — No commitment found for this runner
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1515` |
+| **Slug** | `E1515` |
+| **Category** | `commit_reveal` (Commit-Reveal) |
+
+
+## What happened
+
+No commitment found for this runner.
+
+## Why it happened
+
+The runner attempted to reveal without first submitting a commitment.
+
+## How to fix
+
+Submit a commitment before attempting to reveal.
+
+## Receipt example
+
+```json
+{
+  "code": 1515,
+  "slug": "E1515",
+  "category": "commit_reveal",
+  "what": "No commitment found for this runner",
+  "fix": "Submit a commitment before attempting to reveal.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1515"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

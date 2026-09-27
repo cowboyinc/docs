@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cowboy · Inference</title>
+  <link rel="stylesheet" href="/manage/assets/manage.css">
+  <script src="/manage/assets/manage.js" type="module"></script>
+</head>
+<body>
+<header><a class="brand" href="/manage">COWBOY</a><span>Inference</span><button id="connect">Connect wallet</button></header>
+<main>
+  <div class="intro"><p class="eyebrow">YOUR HIRE</p><h1>Models, ready to work.</h1><p>Manage API keys and view your inference usage.</p></div>
+  <p id="status" role="status" aria-live="polite">Connect your hiring wallet to continue.</p>
+  <div id="workspace" hidden>
+    <section aria-labelledby="keys-title">
+      <div class="section-heading"><div><h2 id="keys-title">API keys</h2><p>Create a key for OpenRouter or an OpenAI-compatible client.</p></div><button id="show-create">Create key</button></div>
+      <form id="create-form" hidden><label>Key name <input id="key-name" maxlength="80" required placeholder="OpenRouter"></label><button type="submit">Create</button><button id="cancel-create" type="button" class="secondary">Cancel</button></form>
+      <div id="secret-panel" hidden><strong>Store your key now. It is shown only once.</strong><pre id="secret"></pre><button id="copy-secret">Copy key</button><button id="clear-secret" class="secondary">Done</button></div>
+      <p id="keys-empty" hidden>No keys yet. Create one to start using your models.</p>
+      <div class="table-wrap"><table><thead><tr><th>Name</th><th>Prefix</th><th>Created (UTC)</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="keys"></tbody></table></div>
+    </section>
+    <section aria-labelledby="usage-title">
+      <div class="section-heading"><div><h2 id="usage-title">Usage</h2><p>Committed usage since the last network reset. All dates are UTC.</p></div></div>
+      <form id="usage-form"><label>From <input id="from" type="date" required></label><label>Through <input id="to" type="date" required></label><label>Key <select id="key-filter"><option value="">All keys</option></select></label><label>Model <select id="model-filter"><option value="">All models</option></select></label><button type="submit">Refresh</button></form>
+      <p id="usage-state" role="status"></p>
+      <div class="totals"><div><span>Requests</span><strong id="requests">—</strong></div><div><span>Input tokens</span><strong id="input-tokens">—</strong></div><div><span>Output tokens</span><strong id="output-tokens">—</strong></div><div><span>Usage cost</span><strong id="cost">—</strong></div></div>
+      <p class="note">Usage cost reflects configured rates. Payment terms are handled separately.</p>
+      <div class="table-wrap"><table><thead><tr><th>Key</th><th>Model</th><th>Requests</th><th>Input tokens</th><th>Output tokens</th><th>Usage cost</th></tr></thead><tbody id="breakdown"></tbody></table></div>
+    </section>
+    <section aria-labelledby="quickstart-title"><h2 id="quickstart-title">Quickstart</h2><p>Use a key with your enabled model. Keep your key private.</p><label>Model <select id="quickstart-model"></select></label><pre id="quickstart"></pre><button id="copy-example" class="secondary">Copy example</button></section>
+    <section id="direct-access" hidden aria-labelledby="direct-title">
+      <h2 id="direct-title">Read files with the CBFS CLI</h2>
+      <p>Register your CLI's public keys to read this hire's key metadata and usage files. Your wallet must have a registered CBFS delegation for the signing key. Keep both private keys in your CLI.</p>
+      <form id="grant-form">
+        <label>Ed25519 signing public key <input id="grant-signing" required pattern="(0x)?[0-9a-fA-F]{64}" maxlength="66" autocomplete="off" spellcheck="false"></label>
+        <label>X25519 encryption public key <input id="grant-encryption" required pattern="(0x)?[0-9a-fA-F]{64}" maxlength="66" autocomplete="off" spellcheck="false"></label>
+        <button type="submit">Enable read access</button>
+      </form>
+      <p id="grant-state" role="status"></p><pre id="grant-connection" hidden></pre>
+      <button id="remove-grant" class="secondary">Remove read access</button>
+    </section>
+  </div>
+</main>
+<footer>Cowboy · Inference that works where you do.</footer>
+</body>
+</html>

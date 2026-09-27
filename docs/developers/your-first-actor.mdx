@@ -1,0 +1,200 @@
+---
+title: "Your First Actor"
+description: "Step-by-step tutorial: write, test, deploy, and call a Cowboy Actor with the Python SDK"
+icon: graduation-cap
+---
+
+## Overview
+
+This tutorial walks through the full development loop for a Cowboy Actor: scaffold a project, write a counter actor with the `cowboy_sdk` Python library, unit-test it off-chain, deploy it to devnet, and call it from the CLI.
+
+The [Quickstart](/getting-started/quickstart) deploys a starter actor; this tutorial is about writing your own. This page assumes the `cowboy` CLI is on your `PATH` and your project has already been initialized with `cowboy init dev` or another configured network.
+
+**What you'll learn:**
+
+- The shape of an SDK actor: `@actor`, handlers, `self.storage`
+- Handler modes (`@pure` vs `@deferred`) and permissions (`@public`)
+- How to unit-test an actor before deploying it
+- The deploy → execute → inspect → iterate loop
+
+## 1. Scaffold a project
+
+```bash
+mkdir counter-tutorial && cd counter-tutorial
+cowboy init dev
+```
+
+This creates a `.cowboy/` directory with a devnet wallet and network config (see [cowboy init](/cli-specs/cowboy-init)). Create a directory for your actor:
+
+```bash
+mkdir -p actors/counter
+```
+
+## 2. Write the actor
+
+Create `actors/counter/main.py`:
+
+```python
+"""A counter actor: increment a value, read it back, emit events."""
+
+from cowboy_sdk import actor, public, pure, runtime, codec
+
+
+@actor
+class Counter:
+    @public(decode="raw")
+    def init(self, payload):
+        self.storage["count"] = 0
+        return b'{"status":"initialized"}'
+
+    @pure
+    @public(decode="raw")
+    def get(self, payload):
+        return codec.encode(self.storage.get("count", 0))
+
+    @public(decode="raw")
+    def increment(self, payload):
+        count = int(self.storage.get("count", 0)) + 1
+        self.storage["count"] = count
+        runtime.emit_event("counter.incremented", {"count": count})
+        return codec.encode(count)
+
+
+# Module-level entrypoints: the PVM dispatches to top-level functions by name.
+def _get_actor():
+    return Counter()
+
+
+def init(payload):
+    return _get_actor().init(payload)
+
+
+def get(payload):
+    return _get_actor().get(payload)
+
+
+def increment(payload):
+    return _get_actor().increment(payload)
+```
+
+### What each piece does
+
+| Piece | Purpose |
+|---|---|
+| `@actor` | Class decorator that injects `self.storage` (persistent key/value state) and `self.address`, and wires handler dispatch |
+| `self.storage["count"]` | Dict-like persistent state; values are CBOR-encoded automatically and metered in Cells |
+| `@public` | Permission decorator — handlers are deny-by-default; `@public` lets anyone call this handler |
+| `decode="raw"` | The handler's payload codec. `raw` hands the handler the exact bytes the host delivered; `cbor` / `json` hand it a decoded value. Always declare it: the undeclared default is scheduled to move from `raw` to `cbor` at an activation height, and an explicit codec is immune to that change ([CIP-6 §9.5](/cips/cip-6-sdk)) |
+| `@pure` | Declares that the handler issues no asynchronous side effects (no `send()`, job submissions, or timers). This does **not** mean "no state access": state reads/writes and synchronous `call()` are allowed. Handlers that need async operations use `@deferred` instead |
+| `runtime.emit_event(name, payload)` | Emits an event visible in actor logs. Pass the object — it is CBOR-encoded automatically, same as storage. `bytes` is the raw hatch for an already-serialized payload |
+| `codec.encode(...)` | Canonical CBOR encoding — the default wire format for everything crossing a trust boundary; a handler or caller may select another codec ([CIP-6 §9.5](/cips/cip-6-sdk)) |
+| Module-level wrappers | Required for on-chain dispatch: the PVM invokes top-level functions by handler name |
+
+<Note>
+  The `init` handler runs once at deploy time (the deploy flow invokes the handler named `init` by default). It is a normal handler, not Python's `__init__`.
+</Note>
+
+### Determinism rules you'll hit first
+
+Actor code must be deterministic — every validator replays it and must get identical results. The SDK ships replacements for the usual suspects:
+
+- `import time` is forbidden → use `runtime.get_block_height()` / `runtime.get_timestamp_ms()` (block-derived time)
+- `import random` is forbidden → use `runtime.randomness(domain)` (protocol randomness)
+- `pickle` is forbidden → use `cowboy_sdk.codec` (CBOR)
+- `set()` iteration order is not deterministic — prefer `cowboy_sdk.ordered_set` when you iterate over a set
+
+See [Determinism & Sandbox](/architecture/actor-vm/determinism-and-sandbox) for the full list.
+
+## 3. Test it off-chain
+
+The SDK includes `SimulatedChain`, an in-memory harness that stubs the PVM host so handlers run as plain Python. Create `actors/counter/test_counter.py`:
+
+```python
+from cowboy_sdk.testing import SimulatedChain
+
+import main
+
+
+def test_increment():
+    chain = SimulatedChain(main.Counter())
+    chain.call("init")
+    chain.call("increment")
+    chain.call("increment")
+
+    result = chain.call("get")
+    assert b"\x02" in result  # CBOR-encoded 2
+
+    events = chain.events()
+    assert events[-1][0] == "counter.incremented"
+
+
+def test_determinism():
+    def scenario(chain):
+        chain.call("init")
+        chain.call("increment")
+
+    chain = SimulatedChain(main.Counter())
+    assert chain.check_determinism(scenario)
+```
+
+Run it with pytest. Make sure the `cowboy_sdk` package is available in your Python test environment. Do not add the PVM's full Python standard library to `PYTHONPATH`; it can shadow CPython's stdlib and break pytest:
+
+```bash
+pytest actors/counter/test_counter.py
+```
+
+For the full testing toolkit — mocking cross-actor calls, advancing blocks to fire timers, state snapshots — see [Testing Actors](/developers/testing-actors).
+
+## 4. Deploy
+
+```bash
+cowboy actor deploy --code actors/counter/main.py --salt 0x01
+```
+
+The salt is a hex string (up to 32 bytes) that lets you deploy the same code to distinct addresses. You'll get a transaction hash and a deterministic actor address (derived from your address, the code, and the salt — compute it ahead of time with `cowboy actor address`). Save it:
+
+```bash
+export COUNTER=<ACTOR_ADDR>
+```
+
+## 5. Call it
+
+```bash
+# Mutate state
+cowboy actor execute --actor $COUNTER --handler increment --payload 0x
+
+# Read state
+cowboy actor execute --actor $COUNTER --handler get --payload 0x
+```
+
+Inspect the actor and its events:
+
+```bash
+cowboy actor get --address $COUNTER
+cowboy actor logs --address $COUNTER
+```
+
+You should see your `counter.incremented` events in the logs.
+
+## 6. Iterate
+
+Edit `main.py`, re-run the tests, and redeploy. Deploying with a **new salt** (e.g. `--salt 0x02`) gives you a fresh actor at a new address; to upgrade the code at an existing address, see [cowboy upgrade-actor](/cli-specs/cowboy-upgrade-actor).
+
+A natural next step: schedule the counter to increment itself. Actors can register block-height timers with `runtime.schedule_timer(...)` and handle the later callback in an `on_timer` handler — see the [Scheduler overview](/architecture/scheduler/overview), or the timer example if you are working from a Cowboy source checkout.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Testing Actors" icon="vial" href="/developers/testing-actors">
+    SimulatedChain, CallMock, and determinism checks in depth
+  </Card>
+  <Card title="Submitting Jobs to Runners" icon="satellite-dish" href="/developers/submitting-jobs">
+    Call LLMs, HTTP APIs, and MCP tools from your actor
+  </Card>
+  <Card title="Working with Tokens" icon="coins" href="/developers/working-with-tokens">
+    Create and move CIP-20 fungible tokens from actors and the CLI
+  </Card>
+  <Card title="SDK Overview" icon="code" href="/developers/sdk">
+    The full cowboy_sdk surface: models, continuations, guards
+  </Card>
+</CardGroup>

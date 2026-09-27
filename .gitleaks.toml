@@ -1,0 +1,22 @@
+# Secrets-scan config for the public docs tree (cowboyinc/docs). The promoted
+# tree must scan clean; the allowlist covers documented test vectors and
+# local-devnet fixtures, never real credentials.
+title = "cowboyinc/docs"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented key-format examples, CIP test vectors, and test fixtures."
+paths = [
+  '''docs/architecture/keys/key-format\.mdx''',
+  '''docs/cli-specs/key-auto-discovery\.mdx''',
+  '''docs/cips/vectors/.*''',
+  '''examples/gallery/inference/tests/fixtures/.*''',
+]
+regexTarget = "line"
+regexes = [
+  '''watch_key=''',
+  '''conversation_key''',
+  '''e2e-signing-secret''',
+]

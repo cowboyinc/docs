@@ -1,0 +1,89 @@
+---
+title: "PVM Reference"
+description: "Reference card: actor code validation rules, importable modules, runtime guards, and continuation limits"
+---
+
+## Overview
+
+This page is the reference card for what the Python Virtual Machine (PVM) accepts and enforces: the static checks applied to actor code, which modules an actor may import, the runtime determinism guards, and the limits the continuation compiler imposes. For the *why*, see [Determinism & Sandbox](/architecture/actor-vm/determinism-and-sandbox); for gas limits and pricing, see [Resource Limits](/architecture/actor-vm/resource-limits) and the [fee model](/architecture/fees/overview).
+
+## Static validation
+
+Actor code is validated before execution. A violation rejects the code with a validation error:
+
+| # | Rule | Detail |
+|---|---|---|
+| 1 | Valid UTF-8 | Code bytes must decode as UTF-8 |
+| 2 | No unbounded asyncio concurrency | `asyncio.gather(`, `asyncio.wait(`, `asyncio.wait_for(`, `asyncio.as_completed(` are rejected as source patterns |
+| 3 | Integer digit runs | No run of more than 1,234 consecutive decimal digits anywhere in the source — including inside strings and comments (the source-level form of the 4096-bit integer cap; hex literals are not covered by this scan) |
+
+## Module imports
+
+The PVM enforces imports with a **whitelist, with a blacklist veto checked first**. Importing anything outside the allowlist raises `NonDeterministicError: module not allowed` (older conceptual pages describe this as an `ImportError`; the implementation raises the dedicated error type).
+
+**Hard-banned (blacklist veto):**
+
+```
+pickle   datetime   os   ctypes   _ctypes   cffi   _cffi_backend
+```
+
+**Redirected:** `import time` and `import random` never resolve to the stdlib modules — the import guard aliases them to the SDK's deterministic replacements before the deny check. Don't rely on the redirect: CIP-6 §17 forbids `import time` / `import random` in actor code; use the supported surface instead — `runtime.get_block_height()` / `runtime.get_timestamp_ms()` for time, and `runtime.randomness(domain)` for randomness.
+
+**Commonly used stdlib modules that are importable:**
+
+| Domain | Modules |
+|---|---|
+| Data & encoding | `json`, `struct`, `base64`, `binascii`, `codecs`, `unicodedata` |
+| Hashing | `hashlib`, `hmac` |
+| Text | `re`, `string` |
+| Collections & functional | `collections`, `collections.abc`, `heapq`, `bisect`, `functools`, `itertools`, `operator` |
+| Typing & classes | `typing`, `abc`, `enum`, `dataclasses`, `types` |
+| Math | `math` (executes on deterministic software floats — see below) |
+
+The authoritative allowlist lives in the PVM's import guard; if a module isn't importable, treat that as the protocol's answer rather than working around it. The SDK itself (`cowboy_sdk`) and the host module (`pvm_host`) are always importable.
+
+## Runtime guards
+
+These are enforced during execution regardless of what static validation saw:
+
+| Guard | Behavior |
+|---|---|
+| Integer size | `builtins.int` is replaced with a guarded subclass: arithmetic on guarded values (`+ - * ** <<` and their reflected forms) producing a result wider than **4,096 bits** raises `OverflowError`. `isinstance(x, int)` still works normally. Known gap: expressions over bare literals (e.g. `2 ** 10000`) bypass the Python-level guard — the source-level digit-run check above catches the common case, and full VM-level enforcement is tracked as a separate work item |
+| File I/O | `open()` (and `io.open`) is replaced and raises — actors cannot touch a filesystem |
+| Floating point | All float arithmetic runs on a software IEEE-754 implementation (SoftFloat) — bit-identical results on every architecture; no native FPU, no JIT |
+| Hash seed | `PYTHONHASHSEED` is pinned to `0`, so `dict`/`set` hashing is reproducible across validators |
+| Locale | Locale is pinned; `setlocale` accepts only `C.UTF-8`, `C`, or `POSIX` and raises on anything else |
+
+<Note>
+  CIP-6 §17 requires `cowboy_sdk.ordered_set` in place of `set()` / `frozenset()`. The VM does not currently block the `set` builtin, but treat the spec rule as binding — hash-based iteration order is exactly the kind of implicit nondeterminism these rules exist to keep out of actor logic.
+</Note>
+
+## Continuation limits
+
+Functions decorated with `@runner.continuation` (or `@actor.continuation`) are compiled to state machines at import time. The compiler statically rejects:
+
+| Limit | Error |
+|---|---|
+| More than **8** sequential `await` points per function | `ContinuationLimitError` |
+| `await` inside a nested function definition | `ContinuationLimitError` |
+| `yield` / `yield from` (generators are not serializable) | `DeterminismError` |
+| `await` inside a `for`/`while` loop without `@bounded_loop` | `ContinuationLimitError` |
+| Recursive `await` of the continuation itself | `ContinuationLimitError` |
+
+`@bounded_loop(max_iterations=N)` (default 1,000) establishes a per-call iteration budget; the loop body must count against it by iterating with `BoundedRange` / `check_iteration()`, and exceeding the budget raises `LoopBoundExceeded` — a plain `for` loop under the decorator is not counted automatically. Variables needed after an `await` must be declared via `capture()` (CIP-6 §10).
+
+## Execution caps
+
+- **Dual gas meters** — every execution is metered in Cycles (compute) and Cells (data); exhausting either aborts with out-of-gas. See [Resource Limits](/architecture/actor-vm/resource-limits).
+- **Sub-limits** — certain invocations run under caps below the transaction budget; for example the current implementation holds CIP-20 transfer hooks to 50,000 Cycles / 50,000 Cells per call.
+- **Storage reads** — reads are tracked during execution and settled to the meters afterward; a read-heavy handler can run out of gas at settlement.
+- **Synchronous call depth** — cross-actor `call()` chains are capped at 32.
+
+## Where the rules live
+
+| Layer | Source (monorepo) |
+|---|---|
+| Static validation | `node/execution/src/pvm_executor.rs` |
+| Import guard & runtime guards | `node/pvm/crates/pvm-runtime/` |
+| Continuation compiler | `node/pvm/Lib/cowboy_sdk/_compiler.py` |
+| Normative spec | [CIP-6 §10, §17](/cips/cip-6-sdk) and [CIP-3](/cips/cip-3-fee-model) |

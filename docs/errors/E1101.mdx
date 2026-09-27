@@ -1,0 +1,44 @@
+---
+title: "E1101 — Non-deterministic actor code"
+description: "Non-deterministic actor code"
+---
+
+# E1101 — Non-deterministic actor code
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1101` |
+| **Slug** | `E1101` |
+| **Category** | `validation` (Validation) |
+| **CIP** | CIP-3 §2.4 |
+
+## What happened
+
+Non-deterministic actor code.
+
+## Why it happened
+
+The actor code uses a banned import, API, or large integer literal that would break consensus determinism. Common triggers: `asyncio.gather`, `import random`, `import time`, `ctypes`, integer literals exceeding 1,234 digits.
+
+## How to fix
+
+Remove the flagged construct. Use `cowboy_sdk.pvm_random` instead of `random`, `cowboy_sdk.pvm_time` instead of `time`, and sequential awaits instead of `asyncio.gather`. See the PVM Compatibility Rules documentation for the full list.
+
+## Receipt example
+
+```json
+{
+  "code": 1101,
+  "slug": "E1101",
+  "category": "validation",
+  "what": "Non-deterministic actor code",
+  "fix": "Remove the flagged construct.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1101"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

@@ -1,0 +1,118 @@
+---
+title: "Minimal Actor"
+description: "The smallest useful shape of a Cowboy actor"
+icon: code
+---
+
+# Minimal Actor
+
+A Cowboy actor is a Python program with handlers that run inside the deterministic Actor VM. The important idea is simple: handlers receive input, read or update actor state through protocol storage, and return a deterministic result.
+
+<Note>
+  Treat this page as the anatomy lesson. Use the [Examples Curriculum](/developers/examples) when you want runnable scripts and a full sweep.
+</Note>
+
+```python
+from cowboy_sdk import actor, public, pure
+
+@actor
+class Counter:
+    @public(decode="raw")
+    def init(self, payload):
+        self.storage["count"] = 0
+        return b'{"status": "initialized"}'
+
+    @public(decode="cbor")
+    def increment(self, payload):
+        self.storage["count"] += 1
+        return {"count": self.storage["count"]}
+
+    @pure
+    @public(decode="cbor")
+    def get_count(self, payload):
+        return {"count": self.storage["count"]}
+```
+
+The SDK shape above is the recommended builder-facing model: `@actor` marks the class, `@public` exposes handlers, and `self.storage` is the durable actor state. One-time setup belongs in an `init` handler that runs during deploy, not Python's `__init__`.
+
+## Core Concepts
+
+### Initialization
+
+The `init` handler sets the actor's initial durable state. Keep it small and explicit. Anything persisted in actor storage is metered as data under the Cells side of the fee model.
+
+### Message Handlers
+
+Handlers are the public entrypoints callers invoke. They should be deterministic, bounded, and easy to reason about. A handler can update storage, return data, emit events, send actor messages, or schedule future execution depending on the APIs it uses.
+
+### Persistent Storage
+
+Actor state lives in protocol storage, not in the local filesystem or network. Reads and writes are metered, so use simple layouts and avoid storing data you can cheaply derive.
+
+### Determinism
+
+Every validator must get the same result for the same actor, state, and message. Avoid local time, randomness, network calls, file I/O, and any dependency on host-specific behavior.
+
+### Autonomous Work
+
+Actors can coordinate with other actors, schedule timers, and suspend for off-chain runner work. Those are larger patterns, but they all build on the same handler-and-state model shown above.
+
+The smallest timer shape is: schedule a block height, include the handler name in the timer payload, and handle the callback later.
+
+```python
+from cowboy_sdk import codec, public, runtime
+
+@public(decode="cbor")
+def start_timer(self, payload):
+    height = runtime.get_block_height() + 10
+    timer_id = runtime.schedule_timer(height, b'{"_handler":"on_timer"}')
+    self.storage["timer_id"] = timer_id
+    return {"status": "scheduled", "height": height}
+
+@public(decode="raw")
+def on_timer(self, payload):
+    self.storage["count"] += 1
+    return codec.encode({"count": self.storage["count"]})
+```
+
+For LLM, HTTP, or MCP work, a runner continuation follows the same idea but spans multiple blocks: initial handler submits the job, the runner executes off-chain, and a generated resume handler commits the result. See [Submitting Jobs to Runners](/developers/submitting-jobs) for the full SDK shape.
+
+## Minimal Flow
+
+1. A caller submits a transaction targeting an actor handler.
+2. The Actor VM loads the actor code and current state.
+3. The handler runs with deterministic inputs and metered resources.
+4. Storage changes, events, messages, timers, and return values are committed if execution succeeds.
+
+### Determinism Checklist
+
+- No file/network/system calls
+- No local randomness or system time
+- Pure interpretation (no JIT)
+- Use protocol storage/messaging/timers only
+
+## Best Practices
+
+- Keep handlers small and deterministic
+- Validate input sizes; fail fast on invalid data
+- Prefer batching writes to reduce Cells
+- Use timers for periodic tasks instead of loops that wait
+- Use runner continuations for LLM, HTTP, MCP, or other off-chain work
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Examples Curriculum" icon="laptop-code" href="/developers/examples">
+    Run the examples and study each pattern in order
+  </Card>
+  <Card title="Actor VM Overview" icon="microchip" href="/architecture/actor-vm/overview">
+    Learn the execution model and guarantees
+  </Card>
+</CardGroup>
+
+## Further Reading
+
+- [Actor VM Overview](/architecture/actor-vm/overview)
+- [Determinism & Sandbox](/architecture/actor-vm/determinism-and-sandbox)
+- [Resource Limits](/architecture/actor-vm/resource-limits)
+- [Examples Curriculum](/developers/examples)

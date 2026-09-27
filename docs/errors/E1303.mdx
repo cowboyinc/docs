@@ -1,0 +1,44 @@
+---
+title: "E1303 — Non-system actor declared a system-only entitlement"
+description: "Non-system actor declared a system-only entitlement"
+---
+
+# E1303 — Non-system actor declared a system-only entitlement
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1303` |
+| **Slug** | `E1303` |
+| **Category** | `entitlement` (Entitlement) |
+
+
+## What happened
+
+Non-system actor declared a system-only entitlement.
+
+## Why it happened
+
+A user-deployed actor declared an entitlement that is reserved for system actors.
+
+## How to fix
+
+Only system actors may declare this entitlement. Remove it from the manifest.
+
+## Receipt example
+
+```json
+{
+  "code": 1303,
+  "slug": "E1303",
+  "category": "entitlement",
+  "what": "Non-system actor declared a system-only entitlement",
+  "fix": "Only system actors may declare this entitlement.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1303"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

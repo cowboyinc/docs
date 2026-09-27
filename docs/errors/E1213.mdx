@@ -1,0 +1,56 @@
+---
+title: "E1213 — Input bytes failed schema validation"
+description: "Input bytes failed schema validation"
+---
+
+# E1213 — Input bytes failed schema validation
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1213` |
+| **Slug** | `E1213` |
+| **Category** | `validation` (Validation) |
+
+
+## What happened
+
+Input bytes failed schema validation.
+
+## Why it happened
+
+A payload could not be decoded or encoded under the codec the handler declared
+([CIP-6 §9.5](/cips/cip-6-sdk)). Despite the catalog wording, this is not limited to the inbound
+direction — the handler side normalizes *every* codec fault to this code, so it covers both:
+
+- **Inbound decode** — the payload does not conform to the expected schema (invalid CBOR
+  structure, wrong field types), or is refused by the declared codec's profile.
+- **Return encode** — the handler returned a value its declared codec cannot serialize.
+
+## How to fix
+
+For an inbound failure, check the encoding and field layout against the target handler's
+expected schema, and confirm the caller's `codec=` matches the handler's `decode=` — the codec
+is not carried on the wire, so a mismatch cannot be detected for you.
+
+For a return failure, check that the returned value is encodable under the handler's declared
+codec. Returning `bytes` passes through unencoded if you have already serialized the payload
+yourself.
+
+## Receipt example
+
+```json
+{
+  "code": 1213,
+  "slug": "E1213",
+  "category": "validation",
+  "what": "Input bytes failed schema validation",
+  "fix": "Check encoding and field layout against the target handler's expected schema.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1213"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

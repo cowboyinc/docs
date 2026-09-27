@@ -1,0 +1,44 @@
+---
+title: "E1210 — Generic PVM execution error"
+description: "Generic PVM execution error"
+---
+
+# E1210 — Generic PVM execution error
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1210` |
+| **Slug** | `E1210` |
+| **Category** | `runtime` (Runtime) |
+
+
+## What happened
+
+Generic PVM execution error.
+
+## Why it happened
+
+An unmapped Python exception was raised inside the actor handler. This is the catch-all for errors that don't have a specific SDK exception class.
+
+## How to fix
+
+Inspect the Python traceback in `context.traceback` to find and fix the handler bug.
+
+## Receipt example
+
+```json
+{
+  "code": 1210,
+  "slug": "E1210",
+  "category": "runtime",
+  "what": "Generic PVM execution error",
+  "fix": "Inspect the Python traceback in `context.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1210"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

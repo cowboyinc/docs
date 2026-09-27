@@ -1,0 +1,36 @@
+{
+  "source": "https://docs.hyperbrowser.ai/api-reference/create-new-scrape-job",
+  "docs_index": "https://docs.hyperbrowser.ai/llms.txt",
+  "base_url": "https://api.hyperbrowser.ai",
+  "auth": {"in": "header", "name": "x-api-key", "secret": "HYPERBROWSER_API_KEY", "scheme": "raw"},
+  "endpoints": {
+    "scrape_submit": {"method": "POST", "path": "/api/scrape", "url": "https://api.hyperbrowser.ai/api/scrape", "returns": "jobId"},
+    "scrape_result": {"method": "GET", "path": "/api/scrape/{jobId}", "url": "https://api.hyperbrowser.ai/api/scrape", "returns": "jobId,status,data,error"}
+  },
+  "wrapper_scrape_inputs": ["hire_id", "url", "formats"],
+  "wrapper_fetch_inputs": ["hire_id", "source_request_id"],
+  "allowed_formats": ["links", "markdown"],
+  "default_formats": ["markdown"],
+  "forced_scrape_options": {"onlyMainContent": true},
+  "job_states": {"terminal_done": "completed", "terminal_failed": ["failed", "stopped"]},
+  "error_envelope": "message",
+  "excluded_endpoints": [
+    "/api/session* (returns a live CDP wsEndpoint/token connect credential; G5)",
+    "/api/crawl* (multi-page async, unbounded delivery)",
+    "/api/scrape/batch* (multi-page async, unbounded delivery)",
+    "/api/extract* (schema-dependent inline result size is unbounded and can park)"
+  ],
+  "excluded_options": [
+    "sessionOptions.useStealth", "sessionOptions.useUltraStealth", "sessionOptions.useProxy",
+    "sessionOptions.proxyServer", "sessionOptions.proxyCountry", "sessionOptions.solveCaptchas",
+    "scrapeOptions.formats:html", "scrapeOptions.formats:screenshot"
+  ],
+  "bounds": {
+    "max_url_chars": 2048,
+    "max_id_chars": 200,
+    "max_error_chars": 500,
+    "max_request_bytes": 8000,
+    "runner_result_bytes": 65536,
+    "result_bytes": 38000
+  }
+}

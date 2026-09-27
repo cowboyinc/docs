@@ -1,0 +1,27 @@
+{
+  "listen": "0.0.0.0:8188",
+  "actor": "0x0000000000000000000000000000000000000000",
+  "chain_id": 1,
+  "network": "canyon",
+  "cbfs": {
+    "binary": "/usr/local/bin/cbfs",
+    "rpc_url": "http://10.0.0.10:4000",
+    "timeout_s": 120,
+    "extra_args": ["--trusted-checkpoint", "/var/lib/cowboy/inference-host/ckpt.bin"]
+  },
+  "nonce_volume": {"name": "inference-nonces", "state_dir": "/var/lib/cowboy/inference-host/cbfs-owner", "owner": "0x0000000000000000000000000000000000000000"},
+  "slots": {
+    "cloud": {
+      "hire_id": 1,
+      "pins": ["<declaration_id>", "<version>", "<artifact_id>"],
+      "public_base_url": "https://<actor>.canyon.cowboylabs.net",
+      "active_key_cap": 8,
+      "hire": {"hirer": "0x0000000000000000000000000000000000000000", "status": "active"},
+      "volume": {"name": "cloud-hire", "state_dir": "/var/lib/cowboy/inference-host/cbfs-owner", "owner": "0x0000000000000000000000000000000000000000"},
+      "grants_state_dir": "/var/lib/cowboy/inference-host/cbfs-owner"
+    }
+  },
+  "issuing_key_hex": "<32-byte ed25519 seed, hex>",
+  "upstream": {"headers": {"authorization": "Bearer <upstream api key>"}, "connect_timeout_s": 10, "idle_timeout_s": 120, "max_connection_s": 600},
+  "max_body_bytes": 4194304
+}

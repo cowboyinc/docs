@@ -1,0 +1,85 @@
+---
+title: "Snapshots & Restore"
+description: "Back up and restore a Cowboy validator — what to save, how to take a consistent snapshot, and how a node fast-syncs from a peer via the state-sync RPC."
+---
+
+A Cowboy validator's durable state is the QMDB state database under the config's
+`directory`, plus a small set of secrets and the genesis file. This runbook
+covers backing those up, restoring them, and the alternative of letting a node
+rebuild state from a peer via fast-sync.
+
+## What to back up
+
+| Item | Where | Why |
+|---|---|---|
+| **Consensus secrets** | `private_key`, `share`, `polynomial` in the validator YAML | Identity + threshold-signing material; losing them means re-keying the validator |
+| **`genesis.json`** | path in `genesis_config_path` | Network identity (`chain_id`, `network`, initial state); must match the network |
+| **State database** | everything under `directory` | The QMDB store — frozen blocks, state log, page cache; the bulk of the data |
+| **`height.dat`** | `data_directory`, if height persistence is enabled | Last-finalized-height recovery hint (absent in multi-node/test setups) |
+
+The validator creates `directory` on first run; you do not pre-create it.
+
+## Take a consistent snapshot
+
+QMDB snapshots are **internal and automatic** — the storage layer records a
+state-sync checkpoint during block finalization. There is no operator command to
+"trigger a snapshot." For a backup you want a filesystem-consistent copy, which
+means quiescing the node first:
+
+```bash
+# 1. Stop the validator gracefully (systemd example)
+sudo systemctl stop cowboy-validator
+
+# 2. Copy the state directory + secrets + genesis to backup storage
+tar czf cowboy-backup-$(date -u +%Y%m%dT%H%M%SZ).tar.gz \
+    /var/lib/cowboy/<directory> \
+    /etc/cowboy/<pubkey>.yaml \
+    /etc/cowboy/genesis.json
+
+# 3. Restart
+sudo systemctl start cowboy-validator
+```
+
+<Warning>
+Copying `directory` while the validator is **running** can capture a torn QMDB
+state. Stop the node (or snapshot the block device atomically, e.g. an LVM/EBS
+snapshot) before copying.
+</Warning>
+
+## Restore
+
+1. Stop the validator.
+2. Restore `directory`, the YAML (with its secrets), and `genesis.json` to their
+   original paths.
+3. Start the validator. It resumes from the restored height and re-joins
+   consensus; if it is behind the tip it catches up via fast-sync (below).
+
+If you only need a node back on the network and don't care about preserving its
+*own* history, skip the restore and let it **fast-sync** from a healthy peer.
+
+## Fast-sync (rebuild from a peer)
+
+A node with little or no local state rebuilds from a peer's QMDB snapshot over
+two RPC endpoints (see the [RPC API reference](/references/rpc-api)):
+
+- **`GET /state/snapshot`** — returns the latest checkpoint metadata:
+  `height`, `range_start`, `op_count`, `ops_root` (MMR root of the operations),
+  and `canonical_root` (the state root at that height). Returns **404** if the
+  node has not recorded a snapshot yet.
+- **`GET /state/operations?size=<n>&start=<i>&max=<m>`** — streams a
+  binary (commonware-codec) batch of state operations plus an MMR range proof.
+  The client loops, advancing `start`, until it has replayed every operation up
+  to `op_count`, verifying each batch against `ops_root`.
+
+```bash
+# Inspect a peer's latest snapshot
+curl -s http://<peer>:<rpc_port>/state/snapshot
+```
+
+Both endpoints are per-IP rate-limited (default 5 req/s, tunable via
+`STATE_SYNC_RATE_PER_SEC`). A syncing node is granted a 10× longer consensus
+activity timeout so it isn't dropped while catching up.
+
+Watch `block_height` on `/health/detailed` rise toward the network tip to
+confirm sync progress (there is no separate percent-complete field — see the
+[note on the `synced` flag](/operations/incident-response#sync-lag)).

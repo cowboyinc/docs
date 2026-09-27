@@ -1,0 +1,223 @@
+---
+title: "cowboy actor"
+description: Deploy, execute, and query actors on the Cowboy blockchain
+icon: code
+---
+
+## Synopsis
+
+```bash
+cowboy actor deploy --code <path> [--salt <hex>] [--private-key <path>] [--nonce <n>]
+                    [--manifest-json <path>]
+                    [--no-init | --init-handler <name> --init-payload <json|@file>]
+                    [flags]
+cowboy actor execute --actor <address> --handler <name> --payload <hex|@file> [--private-key <path>] [--nonce <n>] [flags]
+cowboy actor get --address <address>
+cowboy actor address --code <path> --creator <address> [--salt <hex>]
+cowboy actor new <name>
+cowboy actor logs --address <address> [--rpc-url <url>]
+```
+
+## Subcommands
+
+### `cowboy actor deploy`
+
+Deploy an actor to the chain from a Python source file.
+
+By default, `deploy` is **atomic**: the deployment transaction carries an embedded init call that runs in the same block as the deploy. This closes the race window between deployment and a manual `execute --handler init`, which previously allowed other transactions to observe the actor in an uninitialised state.
+
+**Behavior:**
+
+1. Load the private key using [key auto-discovery](/cli-specs/key-auto-discovery).
+2. Read the actor source code from `--code` path.
+3. Resolve atomic-init parameters (see **Atomic init** below).
+4. Build a DeployActor transaction with the specified fee limits, carrying `init_handler` and `init_payload` unless `--no-init` was passed.
+5. If `--nonce` is omitted, auto-fetch the current nonce from the chain.
+6. If `--cycles-limit` / `--cells-limit` are omitted, auto-discover a safe value from the sender's balance. If `--max-fee-per-cycle` / `--max-fee-per-cell` are omitted, read the current `/basefee`. An explicit value (including `0`) is always used as-is — no auto-discovery when the flag is supplied.
+7. Sign and submit the transaction.
+8. Print the transaction hash, the deterministic actor address, and a summary line showing whether atomic init was applied.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--code` | Required | Path to the actor Python source file |
+| `--salt` | empty | Hex salt for CREATE2-style address derivation (max 32 bytes) |
+| `--private-key` | Auto-discovered | Path to private key file |
+| `--nonce` | unset (auto-fetch from chain) | Transaction nonce. Pass an explicit integer to override. |
+| `--cycles-limit` | unset (auto from balance) | Maximum compute cycles. Pass an explicit integer — including `0`, which means no cycles budget — to override. |
+| `--cells-limit` | unset (auto from balance) | Maximum storage cells. Pass an explicit integer — including `0`, which means no cells budget — to override. |
+| `--max-fee-per-cycle` | unset (reads `/basefee`) | Max fee per compute cycle. Pass an explicit integer — including `0`, which will reject any non-zero basefee — to override. |
+| `--max-fee-per-cell` | unset (reads `/basefee`) | Max fee per storage cell. Pass an explicit integer — including `0`, which will reject any non-zero basefee — to override. |
+| `--manifest-json` | None | Path to an `ActorManifest` JSON file declaring entitlements (optional) |
+| `--no-init` | `false` | Disable atomic init. Use for actors that do not define an `init` handler |
+| `--init-handler` | `init` | Handler name to invoke atomically after deploy |
+| `--init-payload` | `{}` | Payload passed to the init handler — inline JSON string or `@path/to/file.json` |
+
+> **Note on `0` vs. omitted.** `--cycles-limit`, `--cells-limit`, `--max-fee-per-cycle`, and `--max-fee-per-cell` treat *unset* and *explicitly `0`* as two different things. Omit the flag to let the CLI pick a safe value from your balance or the current basefee. Pass `--cycles-limit 0` (or any explicit integer) when you have already computed the exact budget you want — the CLI will use that value verbatim, even if it is zero, and the transaction will revert on the first metered operation if the budget is too small. This avoids surprise overrides in scripts that compute limits up front.
+
+#### Atomic init
+
+By default, the CLI sets `init_handler = "init"` and `init_payload = "{}"`, so a plain `cowboy actor deploy --code ...` both deploys the actor and calls its `init()` handler in the same transaction.
+
+- `--init-handler <name>` overrides the handler name (useful if your actor exposes init under a different method).
+- `--init-payload '<json>'` passes an inline JSON string.
+- `--init-payload @./init.json` reads the payload from a file in the current working directory. File loading is bounded to 1 MB, restricted to the current working directory, and uses `O_NOFOLLOW` to prevent symlink traversal attacks.
+- `--no-init` disables atomic init entirely. Use this when the actor has no init handler; otherwise the deploy transaction will fail because the unknown handler is uncallable.
+- `--no-init` conflicts with `--init-handler` and `--init-payload` — passing both errors out with a clear message.
+
+**Example (default — atomic init):**
+
+```bash
+$ cowboy actor deploy --code actors/counter/main.py
+Transaction: 0xabc123...
+Actor address: 0xdef456...
+  Atomic init: handler="init", payload=2 bytes
+```
+
+**Example (with custom init payload from file):**
+
+```bash
+$ cat init.json
+{"owner": "0x7a3B...F92E", "max_supply": 1000000}
+
+$ cowboy actor deploy --code actors/token/main.py --init-payload @init.json
+Transaction: 0xabc123...
+Actor address: 0xdef456...
+  Atomic init: handler="init", payload=64 bytes
+```
+
+**Example (no init handler on the actor):**
+
+```bash
+$ cowboy actor deploy --code actors/stateless/main.py --no-init
+Transaction: 0xabc123...
+Actor address: 0xdef456...
+  Atomic init: disabled (--no-init)
+```
+
+---
+
+### `cowboy actor execute`
+
+Call a handler method on a deployed actor.
+
+**Behavior:**
+
+1. Load the private key using [key auto-discovery](/cli-specs/key-auto-discovery).
+2. Build an ActorMessage transaction targeting the specified actor and handler.
+3. The payload can be a hex string or a file path prefixed with `@`.
+4. If `--nonce` is omitted, auto-fetch the current nonce from the chain.
+5. Apply the same "unset = auto, explicit = literal" resolution for fee and limit flags as `deploy` (see the note below).
+6. Sign and submit the transaction.
+7. Print the transaction hash.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--actor` | Required | Target actor address (hex) |
+| `--handler` | Required | Handler method name to invoke |
+| `--payload` | Required | Hex-encoded payload or `@path/to/file` |
+| `--private-key` | Auto-discovered | Path to private key file |
+| `--nonce` | unset (auto-fetch from chain) | Transaction nonce. Pass an explicit integer to override. |
+| `--cycles-limit` | unset (auto from balance) | Maximum compute cycles. Pass an explicit integer — including `0`, which means no cycles budget — to override. |
+| `--cells-limit` | unset (auto from balance) | Maximum storage cells. Pass an explicit integer — including `0`, which means no cells budget — to override. |
+| `--max-fee-per-cycle` | unset (reads `/basefee`) | Max fee per compute cycle. Pass an explicit integer — including `0`, which will reject any non-zero basefee — to override. |
+| `--max-fee-per-cell` | unset (reads `/basefee`) | Max fee per storage cell. Pass an explicit integer — including `0`, which will reject any non-zero basefee — to override. |
+
+> **Note on `0` vs. omitted.** Same semantics as `deploy`: omitting a limit/fee flag lets the CLI pick a safe value; passing an explicit integer (including `0`) uses that value verbatim. See the note in `deploy` above for the full rationale.
+
+**Example:**
+
+```bash
+$ cowboy actor execute --actor 0xdef456... --handler increment --payload 0x
+Transaction: 0x789abc...
+```
+
+---
+
+### `cowboy actor get`
+
+Query actor information from the chain.
+
+**Behavior:**
+
+1. Send `GET /actor/<address>` to the RPC endpoint.
+2. Print the actor's metadata (code hash, creator, state).
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--address` | Required | Actor address to query (hex) |
+
+**Example:**
+
+```bash
+$ cowboy actor get --address 0xdef456...
+Actor: 0xdef456...
+  Creator: 0x7a3B...F92E
+  Code hash: 0xabc...
+  State: active
+```
+
+---
+
+### `cowboy actor address`
+
+Compute the deterministic address an actor would have without deploying it (CREATE2-style).
+
+**Behavior:**
+
+1. Read the actor source code from `--code` path.
+2. Compute the address using the creator address, code hash, and salt.
+3. Print the computed address.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--code` | Required | Path to the actor Python source file |
+| `--creator` | Required | Creator address (hex) |
+| `--salt` | `0x00` | Hex salt for address derivation |
+
+**Example:**
+
+```bash
+$ cowboy actor address --code actors/counter/main.py --creator 0x7a3B...F92E
+Actor address: 0xdef456...
+```
+
+---
+
+### `cowboy actor new`
+
+Scaffold a new actor from a template. See [cowboy actor new](/cli-specs/cowboy-actor-new) for full documentation.
+
+---
+
+### `cowboy actor logs`
+
+Fetch the event log for a deployed actor.
+
+**Behavior:**
+
+1. Send a request to the RPC endpoint to fetch logs for the specified actor address.
+2. Print the log entries.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--address` | Required | Actor address (hex) |
+| `--rpc-url` | Auto-discovered | RPC endpoint |
+
+**Example:**
+
+```bash
+$ cowboy actor logs --address 0xdef456...
+[block 42] increment() called
+[block 43] increment() called
+[block 45] get_count() called -> 2
+```

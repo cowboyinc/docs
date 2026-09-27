@@ -1,0 +1,44 @@
+---
+title: "E1214 — Serialization failure"
+description: "Serialization failure"
+---
+
+# E1214 — Serialization failure
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1214` |
+| **Slug** | `E1214` |
+| **Category** | `internal` (Internal) |
+
+
+## What happened
+
+Serialization failure.
+
+## Why it happened
+
+CBOR or internal serialization failed.
+
+## How to fix
+
+Retry the transaction. Report if the error persists.
+
+## Receipt example
+
+```json
+{
+  "code": 1214,
+  "slug": "E1214",
+  "category": "internal",
+  "what": "Serialization failure",
+  "fix": "Retry the transaction.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1214"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

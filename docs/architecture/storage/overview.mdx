@@ -1,0 +1,69 @@
+---
+title: "State & Storage Model"
+description: "How Cowboy stores chain state: a single QMDB instance under a unified fixed-length key, the BLAKE3 state root, state rent, the per-actor storage-root direction (CIP-30), and fast-sync."
+icon: database
+---
+
+All Cowboy chain state — accounts, actors, actor storage, mailboxes, timers,
+receipts — lives in **one QMDB instance**, committed under a single BLAKE3 state
+root. This page covers the storage model; for blob/large-object storage see
+[Data Availability & Blobs](/operations/snapshots-and-restore) and CIP-9.
+
+## One unified key space
+
+Every piece of state is addressed by a **fixed-length 54-byte key**:
+
+```
+[ 1B prefix ][ 20B address ][ 33B slot ]
+```
+
+The leading prefix byte discriminates the data type (account, actor, actor
+storage, mailbox, timer, deferred-tx, …), the address scopes it to an account or
+actor, and the slot disambiguates within that type. Types that don't need the
+full slot zero-fill the remainder. Putting everything in one keyed trie means a
+single state root commits to the entire world state, and per-key inclusion
+proofs work uniformly across data types.
+
+## State root
+
+The chain commits one **BLAKE3** root over the QMDB key/value set per block.
+BLAKE3 is the chain's canonical state hash — the same hash the per-actor
+storage-root work (below) and proof flows build on. The root is recomputed each
+block from the committed write set (see the
+[block lifecycle](/architecture/execution/block-lifecycle)).
+
+## State rent
+
+Persistent state is not free forever — actor storage is subject to **state
+rent**, an ongoing fee for occupying space in the global trie, with the rate
+adjusting to total network state size. Actors that fall behind on rent enter a
+warning/grace window and can eventually be evicted; system actors (the reserved
+low-address band) are exempt. The genesis rent parameters live in the whitepaper §13 parameter registry (`whitepaper/cowboy-technical-whitepaper`) and are governance-tunable. Operators back up
+and restore this state per the
+[snapshots runbook](/operations/snapshots-and-restore).
+
+## Per-actor storage root (direction)
+
+Today the global trie commits `(actor_address, key) → value` with no per-actor
+commitment. The **per-actor storage root** work (CIP-30) gives each actor its own
+Merkle subtree whose root is committed on the `Actor` record, which unlocks:
+
+- **O(1) `fork()`** (CIP-27) — clone an actor's entire state by sharing its
+  `storage_root`, no key enumeration (which today can't recover hashed long
+  keys).
+- **Per-actor proofs** — one digest per actor per block, instead of chasing
+  per-key proofs against the global root (the basis for CIP-17 verifiable reads).
+
+The scheme is a depth-256 Sparse Merkle Trie over BLAKE3 paths (CIP-30 §3.2) —
+chosen so it shares the chain's hash and admits the structural sharing O(1)
+`fork()` needs.
+
+## Fast-sync & snapshots
+
+QMDB records a state-sync checkpoint during block finalization, exposed over
+`/state/snapshot` (checkpoint metadata + roots) and `/state/operations` (a
+binary batch of state operations + an MMR range proof). A fresh node rebuilds
+state by streaming operations from a peer and verifying them against the
+snapshot's `ops_root`. There is no manual "take a snapshot" command — for a
+filesystem backup, quiesce the node and copy its state directory. Full procedure:
+[Snapshots & Restore](/operations/snapshots-and-restore).

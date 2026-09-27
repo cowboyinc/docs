@@ -1,0 +1,14 @@
+{
+  "accession": "0000789019-26-000201",
+  "issuer_cik": "0000789019",
+  "ticker": "MSFT",
+  "issuer_name": "Microsoft Corporation",
+  "owner": "Example CFO",
+  "relationship": "officer",
+  "transaction_code": "S",
+  "acquired_disposed": "D",
+  "shares": 5000,
+  "price": 431.77,
+  "transaction_date": "2026-05-26",
+  "filed_at": "2026-05-27T16:25:00Z"
+}

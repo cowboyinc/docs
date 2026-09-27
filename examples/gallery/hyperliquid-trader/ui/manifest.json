@@ -1,0 +1,7 @@
+{
+  "name": "hl-ui-host",
+  "version": "2.0.0",
+  "entitlements": [
+    { "id": "storage.kv" }
+  ]
+}

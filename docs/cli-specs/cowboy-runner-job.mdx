@@ -1,0 +1,240 @@
+---
+title: "cowboy runner & job"
+description: Manage runners and off-chain compute jobs on the Cowboy blockchain
+icon: server
+---
+
+## Synopsis
+
+```bash
+# Runner commands
+cowboy runner get --address <address>
+cowboy runner list
+cowboy runner register [--private-key <path>] [--stake <cby>] [--nonce <n>]
+
+# Job commands
+cowboy job get --job-id <hex>
+cowboy job status --job-id <hex>
+cowboy job runners --job-id <hex>
+cowboy job results --job-id <hex>
+cowboy job verified --job-id <hex>
+cowboy job submit --job-spec <path> [--private-key <path>] [--nonce <n>]
+```
+
+## Runner Subcommands
+
+### `cowboy runner get`
+
+Query information about a registered runner.
+
+**Behavior:**
+
+1. Query the RPC endpoint for runner details at the given address.
+2. Print runner metadata (address, stake, status, rate card).
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--address` | Required | Runner address (hex) |
+
+**Example:**
+
+```bash
+$ cowboy runner get --address 0x5e6F...A7B8
+Runner: 0x5e6F...A7B8
+  Stake: 50000 CBY
+  Status: active
+```
+
+---
+
+### `cowboy runner list`
+
+List all active runners on the chain.
+
+**Behavior:**
+
+1. Query the RPC endpoint for all registered runners.
+2. Print a summary of each runner.
+
+**Example:**
+
+```bash
+$ cowboy runner list
+0x5e6F...A7B8  Stake: 50000 CBY  Status: active
+0x9c0D...E1F2  Stake: 50000 CBY  Status: active
+```
+
+---
+
+### `cowboy runner register`
+
+Register a new runner node on the chain.
+
+**Behavior:**
+
+1. Load the private key using [key auto-discovery](/cli-specs/key-auto-discovery).
+2. Build a runner registration transaction with the specified stake amount.
+3. Stake amount is specified in CBY (converted internally: `stake * 10^9`).
+4. Includes a default rate card for job pricing.
+5. Sign and submit the transaction.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--private-key` | Auto-discovered | Path to private key file |
+| `--stake` | `50000` | Stake amount in CBY |
+| `--nonce` | `0` (auto-fetch) | Transaction nonce |
+
+**Example:**
+
+```bash
+$ cowboy runner register --stake 50000
+Transaction: 0xabc123...
+Runner registered: 0x5e6F...A7B8
+  Stake: 50000 CBY
+```
+
+## Job Subcommands
+
+### `cowboy job get`
+
+Retrieve a job specification by ID.
+
+**Behavior:**
+
+1. Query the RPC endpoint for the job spec with the given ID.
+2. Print the job details (type, parameters, requester).
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--job-id` | Required | Job ID (hex) |
+
+**Example:**
+
+```bash
+$ cowboy job get --job-id 0xjob123...
+Job: 0xjob123...
+  Type: llm_inference
+  Requester: 0x7a3B...F92E
+  Status: assigned
+```
+
+---
+
+### `cowboy job status`
+
+Query the current status of a job.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--job-id` | Required | Job ID (hex) |
+
+**Example:**
+
+```bash
+$ cowboy job status --job-id 0xjob123...
+Status: completed
+```
+
+---
+
+### `cowboy job runners`
+
+List the runners assigned to a job.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--job-id` | Required | Job ID (hex) |
+
+**Example:**
+
+```bash
+$ cowboy job runners --job-id 0xjob123...
+0x5e6F...A7B8  Status: completed
+0x9c0D...E1F2  Status: completed
+0xaB3C...D4E5  Status: pending
+```
+
+---
+
+### `cowboy job results`
+
+Retrieve all results submitted by runners for a job.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--job-id` | Required | Job ID (hex) |
+
+**Example:**
+
+```bash
+$ cowboy job results --job-id 0xjob123...
+Runner 0x5e6F...A7B8: {"answer": "42"}
+Runner 0x9c0D...E1F2: {"answer": "42"}
+```
+
+---
+
+### `cowboy job verified`
+
+Retrieve the verified (consensus) result for a job.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--job-id` | Required | Job ID (hex) |
+
+**Example:**
+
+```bash
+$ cowboy job verified --job-id 0xjob123...
+Verified result: {"answer": "42"}
+  Consensus: 2/3 runners agreed
+```
+
+---
+
+### `cowboy job submit`
+
+Submit a new off-chain compute job.
+
+**Behavior:**
+
+1. Load the private key using [key auto-discovery](/cli-specs/key-auto-discovery).
+2. Read the job specification from a CBOR file.
+3. Build and sign a job submission transaction.
+4. Submit to the chain.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--job-spec` | Required | Path to CBOR job specification file |
+| `--private-key` | Auto-discovered | Path to private key file |
+| `--nonce` | `0` (auto-fetch) | Transaction nonce |
+
+**Example:**
+
+```bash
+$ cowboy job submit --job-spec job.cbor
+Transaction: 0xabc123...
+Job ID: 0xjob456...
+```
+
+## Edge Cases
+
+- Runner registration requires sufficient CBY balance for the stake.
+- Job submission requires the job spec to be valid CBOR format.
+- Read-only commands (`get`, `list`, `status`, `runners`, `results`, `verified`) do not require a private key.

@@ -1,0 +1,24 @@
+# Per-deployment artifacts written by tools/setup_live.sh and the demo runs.
+# deploykey is a live private key and must never be committed; the rest are
+# regenerated per env and go stale the moment it reaps.
+tools/deploykey
+tools/deployer.txt
+tools/actor.txt
+tools/research.txt
+tools/research_test.txt
+tools/manifest.json
+tools/notify.txt
+tools/notify_test.txt
+
+# Local deployment snapshots, backups, and environment-specific credentials.
+tools/*deploykey*
+tools/*.bak
+tools/actor.prev.txt
+tools/canyon_research.txt
+tools/cal-river-backup/
+tools/env-base/
+
+# Python test/build artifacts.
+__pycache__/
+tests/__pycache__/
+.pytest_cache/

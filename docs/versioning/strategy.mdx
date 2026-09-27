@@ -1,0 +1,70 @@
+---
+title: Versioning Strategy
+description: How Cowboy manages protocol and documentation versions
+icon: code-pull-request-draft
+---
+
+## Introduction
+
+Cowboy follows a clear versioning strategy to balance innovation with stability. This page explains how versions are numbered, released, and maintained.
+
+<Tip>
+  **Transparency**: All version changes are tracked, documented, and announced well in advance.
+</Tip>
+
+---
+
+
+### Node Software Version (cowboy-node)
+
+- Tracks the client implementation.
+- Aligns with protocol versions; patches do not change protocol.
+```
+cowboy-node v0.1.1 → Protocol v0.1.0 (patch)
+cowboy-node v0.2.0 → Protocol v0.2.0 (minor)
+```
+
+### SDK Version
+
+- Tracks API surface and developer experience.
+- Independent from protocol; publishes its own semver.
+```
+cowboy-sdk v0.3.0 → Breaking API change (SDK only)
+```
+
+### Documentation Version
+
+- Tracks content and structure.
+- Tags align to major protocol milestones (e.g., `docs-v0.1`).
+
+---
+
+
+## Compatibility Guarantees (Essentials)
+
+### Backwards Compatibility
+
+- Minor protocol releases are backwards compatible for existing actors.
+- No mandatory upgrades for actor developers on minor bumps.
+
+### Breaking Changes
+
+- Announced well in advance with migration notes.
+- Testnet period precedes mainnet activation.
+
+### Deprecation Policy (Typical)
+
+- Deprecate with warnings → grace period → removal in a major release.
+
+---
+
+## Long-Term Support (LTS)
+
+- Early-stage project: LTS policy will be announced with future milestones.
+
+---
+
+## Announcements & Communication
+
+- Primary channel: **GitHub Releases** (`cowboyinc/cowboy`) and documentation changelog.
+- Major releases: advance notice with migration notes; patch releases: announced on release.

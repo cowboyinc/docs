@@ -1,0 +1,44 @@
+---
+title: "E1212 — Unsupported instruction/opcode"
+description: "Unsupported instruction/opcode"
+---
+
+# E1212 — Unsupported instruction/opcode
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1212` |
+| **Slug** | `E1212` |
+| **Category** | `validation` (Validation) |
+
+
+## What happened
+
+Unsupported instruction/opcode.
+
+## Why it happened
+
+The actor code contains an instruction or opcode not supported on this chain version.
+
+## How to fix
+
+Use a supported instruction. Check the chain version's compatibility documentation.
+
+## Receipt example
+
+```json
+{
+  "code": 1212,
+  "slug": "E1212",
+  "category": "validation",
+  "what": "Unsupported instruction/opcode",
+  "fix": "Use a supported instruction.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1212"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

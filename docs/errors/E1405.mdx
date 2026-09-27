@@ -1,0 +1,44 @@
+---
+title: "E1405 — Token account is frozen"
+description: "Token account is frozen"
+---
+
+# E1405 — Token account is frozen
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1405` |
+| **Slug** | `E1405` |
+| **Category** | `token` (Token (CIP-20)) |
+| **CIP** | CIP-20 |
+
+## What happened
+
+Token account is frozen.
+
+## Why it happened
+
+The token account has been frozen by the token administrator.
+
+## How to fix
+
+Contact the token authority to unfreeze the account.
+
+## Receipt example
+
+```json
+{
+  "code": 1405,
+  "slug": "E1405",
+  "category": "token",
+  "what": "Token account is frozen",
+  "fix": "Contact the token authority to unfreeze the account.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1405"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

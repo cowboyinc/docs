@@ -1,0 +1,193 @@
+---
+title: Metering Points Reference
+description: Complete reference of where and how Cycles, Accesses, and Cells are charged
+---
+
+## Introduction
+
+This document provides a comprehensive reference for metering points in Cowboy's three-meter system: Cycles, Accesses, and Cells. Use this as a lookup table to understand exactly when and how much resources are consumed.
+
+<Tip>
+  **Consensus-Critical**: Cycles, Accesses, and Cells are consensus-critical meters. The Technical Whitepaper §4.1 defines Access semantics; any implementation deviation can cause state forks.
+</Tip>
+
+> Note: Names and code snippets shown here are conceptual and illustrative. The normative content is the metering points and costs (per CIP-3). Final SDK interfaces and naming may differ; always refer to the SDK and Developer Guide for usage.
+
+## Cycle Metering Points
+
+Cycles are charged **before** each operation executes. If insufficient cycles remain, execution halts immediately.
+
+### Python Bytecode Operations
+
+| Operation Type | Cycles Cost |
+| :---- | ----: |
+| Python Arithmetic Ops (+, -, *, /, %) | 1 |
+| Python Function Call | 10 |
+| Dictionary Get/Set | 3 |
+| List Append/Access | 2 |
+| String Operation (per character) | 1 |
+
+Dynamic surcharges apply based on operand types and sizes (see [Dynamic Typing Surcharges](#dynamic-typing-surcharges)).
+
+### Host Function Categories (CIP-backed)
+
+| Category | Example Costs (Cycles) | Notes |
+|----------|------------------------|-------|
+| Storage I/O | Structural store I/O is metered in **Accesses** (cold Read 1 / Write 1) per CIP-43; read-side value bytes cost 7 cycles/KiB (COW-3633). The flat 10/50 cycle charge is removed. | Persisted write bytes charged in Cells |
+| Messaging | Send: 80 | Payload Cells metered separately |
+| Timers (CIP‑1) | Set/Cancel: 200/50 | Execution under block timer budget |
+| Cryptography | ECDSA: 3,000; BLS: 8,000; Hash/32B: ~6 | Deterministic implementations |
+| Blobs | Commit per KiB: 40 | Content‑addressed data |
+| Imports | First: 100 (+init), Cached: 5, Disallowed: 50 | Whitelist enforced |
+
+### Built-in Functions (Selected, CIP-backed)
+
+| Function | Cycles (base) | Notes |
+|----------|----------------|-------|
+| `len(obj)` | 5 | O(1) table lookup |
+| `sorted(iterable)` | 20 + n×log₂(n) | Size-dependent |
+| `sum(iterable)` | 10 + (n−1) | Plus element type costs |
+| `max/min(iterable)` | 10 + (n−1) | Plus comparison costs |
+| `str(obj)` | 10 + len(result) | Serialized size dependent |
+| `bytes(iterable)` | 10 + n | Number of bytes |
+| `list(iterable)` | 10 + n×2 | Element count based |
+| `set(iterable)` | 15 + n×5 | Hashing cost included |
+| `dict(iterable)` | 15 + n×8 | Pair count based |
+
+### Dynamic Typing Surcharges
+
+Operations have base cost + dynamic surcharge based on runtime types:
+
+<Tabs>
+  <Tab title="String Operations">
+    | Operation | Base | Surcharge | Example |
+    |-----------|------|-----------|---------|
+    | `str + str` | 1 | len(left) + len(right) | `"hello" + "world"` = 11 cycles |
+    | `str * int` | 1 | len(str) × multiplier | `"ab" * 100` = 201 cycles |
+    | `str == str` | 1 | min(len(left), len(right)) | `"abc" == "abd"` = 4 cycles |
+    | `str[i]` | 2 | 0 | Constant time |
+    | `str[i:j]` | 2 | j - i | Proportional to slice |
+  </Tab>
+  
+  <Tab title="List Operations">
+    | Operation | Base | Surcharge | Example |
+    |-----------|------|-----------|---------|
+    | `list + list` | 1 | len(left) + len(right) | `[1,2] + [3,4]` = 5 cycles |
+    | `list * int` | 1 | len(list) × multiplier | `[1,2] * 50` = 101 cycles |
+    | `list[i]` | 2 | 0 | Constant time |
+    | `list[i:j]` | 2 | j - i | Proportional to slice |
+    | `list.append(x)` | 2 | 0 (+ expansion if needed) | |
+    | `list.insert(i, x)` | 5 | len(list) - i | Move elements |
+    | `list.remove(x)` | 5 | len(list) | Linear search |
+    | `list.sort()` | 20 | len × log₂(len) | |
+  </Tab>
+  
+  <Tab title="Dict Operations">
+    | Operation | Base | Surcharge | Example |
+    |-----------|------|-----------|---------|
+    | `dict[key]` | 3 | key_hash_cost | |
+    | `dict[key] = value` | 5 | key_hash_cost + expansion | |
+    | `del dict[key]` | 4 | key_hash_cost | |
+    | `dict.get(key, default)` | 5 | key_hash_cost | |
+    | `dict.update(other)` | 10 | len(other) × 8 | |
+    | `dict == dict` | 1 | min(len(left), len(right)) × 10 | |
+    
+    **Key hash costs**:
+    - Integer key: 1 cycle
+    - String key: len(string) cycles
+    - Tuple key: len(tuple) × 2 cycles
+  </Tab>
+  
+  <Tab title="Set Operations">
+    | Operation | Base | Surcharge | Example |
+    |-----------|------|-----------|---------|
+    | `set.add(item)` | 4 | hash_cost(item) | |
+    | `set.remove(item)` | 5 | hash_cost(item) | |
+    | `item in set` | 3 | hash_cost(item) | |
+    | `set \| set` | 1 | len(left) + len(right) | Union |
+    | `set & set` | 1 | min(len(left), len(right)) × 2 | Intersection |
+    | `set - set` | 1 | len(left) + len(right) | Difference |
+    | `set == set` | 1 | min(len(left), len(right)) × 5 | |
+  </Tab>
+</Tabs>
+
+### Exception Handling
+
+| Operation | Cycles | Description |
+|-----------|--------|-------------|
+| Enter `try` block | 5 | Set up exception handler |
+| `raise Exception()` | 30 | Create and throw exception |
+| Enter `except` block | 10 | Exception type matching |
+| Enter `finally` block | 5 | Cleanup execution |
+| Exception propagation | 8 per frame | Stack unwinding |
+| Uncaught exception | 20 | Top-level error handling |
+
+### Module Imports
+
+| Operation | Cycles | Notes |
+|-----------|--------|-------|
+| First import (whitelisted) | 100 + init_cost | Load + execute module init |
+| Cached import | 5 | From in-transaction cache |
+| Failed import (not whitelisted) | 50 | Penalty cost + ImportError |
+| Import alias (`as`) | 2 | Namespace binding |
+
+## Cell Metering Points
+
+Cells are charged at specific I/O boundaries, not on every instruction.
+
+### Transaction Intrinsic
+
+**When**: Before VM execution begins  
+**What**: Transaction payload size
+
+Charged immediately upon transaction submission based on payload size.
+
+### Memory Allocation
+
+**When**: Object creation  
+**What**: Allocated memory size
+
+<Tabs>
+  <Tab title="Primitive Types">
+    | Object Type | Cells Cost (bytes) | Notes |
+    |-------------|---------------------|-------|
+    | `int` (small −5..256) | 0 | Pre‑allocated |
+    | `int` (large) | 8 + ⌈bitlen/8⌉ | Header + value storage |
+    | `float` | 16 | Header + 8‑byte double |
+    | `bool` | 0 | Singleton |
+    | `str` | 24 + len(s) | UTF‑8 bytes |
+    | `list` | 40 + 8×capacity | Header + pointer array |
+    | `dict` | 64 + 16×buckets | Header + hash table |
+    | `tuple` | 24 + 8×len | Fixed pointer array |
+    | `set` | 64 + 16×buckets | Similar to dict |
+  </Tab>
+  
+  <Tab title="Collections">
+    | Type | Formula | Example |
+    |------|---------|---------|
+    | `list` | 40 + 8×capacity | `[1,2,3]` → 64 Cells (cap=3) |
+    | `tuple` | 24 + 8×len | `(1,2,3)` → 48 Cells |
+    | `dict` | 64 + 16×buckets | `{}` → 192 Cells (8 buckets) |
+    | `set` | 64 + 16×buckets | `set()` → 192 Cells |
+  </Tab>
+  
+  <Tab title="Objects">
+    | Type | Formula | Example |
+    |------|---------|---------|
+    | User object | 32 + 8×num_attrs | `MyClass()` (2 attrs) → 48 Cells |
+    | Function | 48 | `def foo(): pass` → 48 Cells |
+    | Class | 128 + members | `class Foo: pass` → 128+ Cells |
+  </Tab>
+</Tabs>
+
+### Quick Reference (Selected)
+
+| Operation | Cycles |
+|-----------|--------|
+| Integer addition | 1 |
+| Function call | 10 |
+| Storage read | 10 |
+| Storage write | 50 |
+| Message send | 80 |
+| Set timer | 200 |
+| ECDSA verify | 3,000 |

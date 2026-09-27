@@ -1,0 +1,44 @@
+---
+title: "E1606 — Runner not assigned to job"
+description: "Runner not assigned to job"
+---
+
+# E1606 — Runner not assigned to job
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1606` |
+| **Slug** | `E1606` |
+| **Category** | `runner` (Runner / Consensus) |
+| **CIP** | CIP-2 |
+
+## What happened
+
+Runner not assigned to job.
+
+## Why it happened
+
+This runner was not selected for the specified job.
+
+## How to fix
+
+This runner cannot submit a result for this job.
+
+## Receipt example
+
+```json
+{
+  "code": 1606,
+  "slug": "E1606",
+  "category": "runner",
+  "what": "Runner not assigned to job",
+  "fix": "This runner cannot submit a result for this job.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1606"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

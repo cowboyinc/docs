@@ -1,0 +1,43 @@
+---
+title: "Callback, Timeout & Challenge"
+description: "Callback mechanism, timeout handling, and verification modes for off-chain compute"
+---
+
+# Callback, Timeout & Challenge
+
+Off-chain compute includes three key mechanisms: how results are returned (callback), how stalled tasks are handled (timeout), and how correctness is enforced (verification modes). Normative behavior follows the CIP-2 architecture and the scheduler mechanics in CIP-1.
+
+> Note: Descriptions are principle-level (non‑normative). Final interfaces and usage should follow the SDK and Developer Guide; normative behavior is defined by CIP‑2 (Off‑chain workflow) and CIP‑1 (deferred execution via scheduler).
+
+## Callback Mechanism
+
+After the required number of runner results (N) are collected by the Runner Submission contract, a **deferred transaction** is constructed to deliver the aggregated results to the developer's actor. This decouples result delivery from the main execution path and preserves block performance (CIP‑2 + CIP‑1).
+
+- Result collection: The Runner Submission contract accepts results from deterministically selected runners (see Lifecycle). Each submission is checked against the declared `result_schema` (size/format bounds) and the requested `proof_type` (if any).
+- Deferred callback: When N valid results are present, a deferred transaction is created to call the actor’s callback with the collected results. Inclusion and execution are handled by the scheduler under its budget.
+- Payment finalization: Within the callback, the actor selects the consumed result and MUST call `consume_result(task_id, consumed_runner_address)` on the Dispatcher to finalize payment (CIP‑2).
+
+## Timeout Handling
+
+Tasks specify a `timeout_blocks`. If the required N results are not collected before the timeout height:
+
+- Task status: The task is finalized as timed out per CIP‑2. Submissions after the timeout are invalid.
+- Application response: The actor/application may resubmit the task, adjust parameters (e.g., `num_runners`, `proof_type_requested`, `timeout_blocks`), or take other app‑specific actions.
+- Runner behavior: Runners unable to execute SHOULD `skip_task` promptly to advance selection, minimizing timeouts.
+
+## Verification Modes (Acceptance Rules)
+
+Different verification modes imply different on‑chain acceptance checks (CIP‑2):
+
+- ZK proof provided: The on‑chain verifier validates the proof at submission; a valid proof is accepted without further challenge.
+- TEE attestation provided: Attestation is verified at submission against policy (e.g., vendor, measurement). Acceptance is policy‑driven.
+- N‑of‑M consensus: Acceptance based on a quorum of matching results; outliers are ignored and only a selected result is consumed.
+
+> Note: CIP‑2 defines selection, submission, schema validation, and proof verification at submission time. "Optimistic" challenge windows are not part of the core protocol; any additional dispute policies are application‑defined and out of scope for the normative flow.
+
+## Further Reading
+
+- [Off-chain Overview](/architecture/offchain/overview)
+- [Runner Lifecycle](/architecture/offchain/lifecycle)
+- [Scheduler Overview](/architecture/scheduler/overview)
+

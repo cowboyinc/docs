@@ -1,0 +1,14 @@
+{
+  "accession": "0000320193-26-000102",
+  "issuer_cik": "0000320193",
+  "ticker": "AAPL",
+  "issuer_name": "Apple Inc.",
+  "owner": "Example Officer",
+  "relationship": "officer",
+  "transaction_code": "P",
+  "acquired_disposed": "A",
+  "shares": 8500,
+  "price": 189.15,
+  "transaction_date": "2026-05-26",
+  "filed_at": "2026-05-27T15:11:00Z"
+}

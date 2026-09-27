@@ -1,0 +1,149 @@
+---
+title: "Annotated Examples"
+description: "Line-by-line walkthroughs of three representative Cowboy actors — a CIP-20 token user, a self-rescheduling timer, and a runner continuation — explaining the design decisions, not just the syntax."
+icon: book-open
+---
+
+The [example index](/developers/examples) lists 30+ runnable actors. This page
+goes deeper on three that each teach a distinct Cowboy concept, explaining *why*
+the code is shaped the way it is. Read these alongside
+[Your First Actor](/developers/your-first-actor) and the
+[SDK reference](/developers/sdk-reference).
+
+## 1. CIP-20 tokens
+
+The code: `examples/core/05-tokens-and-balances`.
+
+The key idea: **CIP-20 tokens are not actor contracts.** Unlike ERC-20 (a
+Solidity contract per token), a Cowboy token is a first-class chain primitive —
+create / transfer / approve / mint / burn are **native validator instructions**,
+and balances live in a global **Token Registry**, not in any actor's storage.
+
+That design choice has consequences worth internalizing:
+
+- **No contract to deploy.** `cowboy token create --name "My Token" --symbol MTK
+  --decimals 18 --initial-supply 1000000` mints a token in a single system tx;
+  there is no bytecode and no per-token storage to rent.
+- **The validator enforces invariants** (overflow, underflow, frozen accounts) —
+  you cannot write a buggy `transfer` that loses funds, because you don't write
+  `transfer` at all.
+- **Actors compose with tokens via host functions**, not message calls:
+  ```python
+  from cowboy_sdk import runtime
+  token_id = runtime.token_create(
+      name=b"My Token", symbol=b"MTK", decimals=18,
+      initial_supply=1_000_000, max_supply=None,
+      transfer_hook=None,        # or an actor address to gate transfers
+      metadata_uri=None,
+  )
+  runtime.token_transfer(token_id, to=recipient, amount=500)
+  ```
+  These run inside the PVM and settle atomically with the rest of the handler —
+  the basis for DeFi-style composability (see `examples/gallery/liquidity-pools`).
+
+**When to reach for `transfer_hook`:** it names an actor the validator calls on
+every transfer, letting you implement allowlists / fee-on-transfer / freezes
+*without* owning the token logic. It is the one place token behavior becomes
+programmable — use it sparingly, because it runs on every transfer and is
+metered against the transfer's gas.
+
+## 2. Self-rescheduling timers
+
+The code: `examples/core/07-timers-and-automation`.
+
+This actor advances a counter purely by **rescheduling itself** — no external
+keeper, no cron. It is the canonical pattern for "do X every N blocks."
+
+The mechanics that matter:
+
+```python
+timer_id = runtime.schedule_after(
+    delay_blocks,                       # blocks from now, must be >= 1
+    "on_timer",                         # the handler the fire routes to
+    codec.encode({"tag": "tick"}),      # per-fire data
+    fee_payer=runtime.get_sender() or None,
+)
+```
+
+- **Block height, never wall-clock.** `schedule_after` resolves the fire height
+  as `get_block_height() + delay_blocks`, because wall-clock time is
+  nondeterministic. Use `get_timestamp_ms()` only for display, never for
+  scheduling logic. `cowboy_sdk.timer.schedule(height, payload, handler=...)` is
+  the absolute-height form of the same call when you already hold a target
+  height — `schedule_after` delegates to it, so they share one encoder. (Don't
+  confuse that method with the `timer.schedule` *entitlement* id both forms
+  require.)
+- **Handler routing.** Naming a handler wraps the payload in the routing
+  envelope so the fire invokes that method rather than the default
+  `handle_timer` — one actor can schedule several distinct callbacks. The
+  envelope is the SDK's to build; don't hand-roll it, and don't reach past
+  `runtime` to the host.
+- **The delivered payload is not the scheduled payload.** The node re-serializes
+  the envelope's inner payload as a JSON list of byte values, so the handler
+  reads its data back with `codec.decode(bytes(json.loads(payload)))`. The
+  examples wrap that in a small `_timer_payload` helper.
+- **`fee_payer` may only be the actor or the tx sender.** Third-party
+  sponsorship is rejected by the host, so `schedule_after(..., fee_payer=sender)`
+  shifts a fire onto the caller *only when an external transaction arms it*. A
+  self-rescheduling loop re-arms from inside its own fire, where the sender is
+  the actor itself — so every fire after the first is actor-funded whatever you
+  pass. Budget for that: keep the actor topped up. A timer whose fee-payer can
+  no longer fund a fire self-destructs, so the loop stops cleanly instead of
+  erroring forever. (System actors paying themselves are a special case — the
+  reserved `0x01..=0xFF` band — every address below
+  `RESERVED_SYSTEM_ADDRESS_LIMIT = 0x100` — is rejected as a `fee_payer` unless
+  it is the scheduling actor's own address.)
+- **One-shot, so re-arm explicitly.** Each timer fires once; to keep a cadence,
+  the fire handler schedules the next one. There is no "recurring timer" flag —
+  the re-arm is in your handler, which keeps the control flow visible.
+- **Declare the fire handler with `@timer`.** It takes the deferred handler mode
+  a re-arming handler needs, and it is deliberately *not* `@public`: a fire
+  arrives with the actor's own address as sender, which deny-by-default already
+  admits, so leaving the handler undeclared to outside callers keeps anyone from
+  driving the loop by hand.
+
+## 3. Runner continuations
+
+The code: `examples/core/08-minimal-runner-continuation`.
+
+Off-chain work (an LLM call, an HTTP fetch) can't block a handler — the block
+must finalize. Cowboy's answer is the **continuation**: you write straight-line
+`async`/`await` code, and the SDK compiles it into a resumable state machine.
+
+```python
+@runner.continuation
+async def _run_refresh_job(self, payload):
+    request = codec.decode(payload) if payload else {}
+    ctx = capture()                       # variables that must survive the await
+    ctx.request_id = int(request.get("request_id", 0))
+
+    result = await runner.http(           # suspends here; the block finalizes
+        request.get("source_url", DEFAULT_SOURCE_URL),
+        method="GET", timeout_ms=5000,
+    )
+    return self._finalize_refresh(ctx.request_id, result)   # runs when the runner replies
+```
+
+What's actually happening — and the rules that fall out of it:
+
+- **The `await` is a suspension point, not a thread block.** At `await
+  runner.http(...)` the handler returns; the job is dispatched to an off-chain
+  runner; a later block delivers the result and the SDK resumes the code *after*
+  the `await`. You do **not** hand-write the resume method — `@runner.continuation`
+  generates the state machine at import time.
+- **`capture()` is mandatory for anything crossing the await.** Local variables
+  don't survive suspension automatically — only fields you stash on the
+  `capture()` context (`ctx.request_id`) are serialized into the continuation
+  state and available on resume. Forgetting this is the #1 continuation bug.
+- **The compiler enforces determinism limits** (see the
+  [PVM reference](/architecture/actor-vm/pvm-reference)): no more than 8
+  sequential awaits per function, no `await` inside a nested function or a bare
+  loop (use `@bounded_loop`), no generators. These exist because the state
+  machine must be finite and serializable.
+- **Finalize is ordinary, synchronous code.** `_finalize_refresh` writes state
+  and emits an event — it runs in the resume frame like any handler, so the
+  normal gas/determinism rules apply.
+
+This is the same machinery behind `runner.agent(...)` (LLM tool-calling over
+mounted CBFS volumes) and `examples/core/09-runner-llm` — `await` an off-chain result,
+resume deterministically when it lands.

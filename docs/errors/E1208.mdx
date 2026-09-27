@@ -1,0 +1,44 @@
+---
+title: "E1208 — Entitlement quota exceeded"
+description: "Entitlement quota exceeded"
+---
+
+# E1208 — Entitlement quota exceeded
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1208` |
+| **Slug** | `E1208` |
+| **Category** | `entitlement` (Entitlement) |
+
+
+## What happened
+
+Entitlement quota exceeded.
+
+## Why it happened
+
+The actor exceeded a quota defined in its entitlement grant (e.g., `max_bytes` for storage, `max_messages` for messaging).
+
+## How to fix
+
+Request a higher quota in the entitlement grant, or batch writes to stay within limits.
+
+## Receipt example
+
+```json
+{
+  "code": 1208,
+  "slug": "E1208",
+  "category": "entitlement",
+  "what": "Entitlement quota exceeded",
+  "fix": "Request a higher quota in the entitlement grant, or batch writes to stay within limits.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1208"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

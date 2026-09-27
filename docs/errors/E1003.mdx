@@ -1,0 +1,44 @@
+---
+title: "E1003 — Insufficient balance for value transfer"
+description: "Insufficient balance for value transfer"
+---
+
+# E1003 — Insufficient balance for value transfer
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1003` |
+| **Slug** | `E1003` |
+| **Category** | `validation` (Validation) |
+
+
+## What happened
+
+Insufficient balance for value transfer.
+
+## Why it happened
+
+The sender's account balance is lower than the value being transferred in the transaction.
+
+## How to fix
+
+Fund the sender account before retrying.
+
+## Receipt example
+
+```json
+{
+  "code": 1003,
+  "slug": "E1003",
+  "category": "validation",
+  "what": "Insufficient balance for value transfer",
+  "fix": "Fund the sender account before retrying.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1003"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

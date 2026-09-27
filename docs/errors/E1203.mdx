@@ -1,0 +1,44 @@
+---
+title: "E1203 — Host lookup not found"
+description: "Host lookup not found"
+---
+
+# E1203 — Host lookup not found
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1203` |
+| **Slug** | `E1203` |
+| **Category** | `runtime` (Runtime) |
+
+
+## What happened
+
+Host lookup not found.
+
+## Why it happened
+
+The target address, storage key, or other identifier referenced in the host call does not exist.
+
+## How to fix
+
+Verify the target address or key exists before referencing it.
+
+## Receipt example
+
+```json
+{
+  "code": 1203,
+  "slug": "E1203",
+  "category": "runtime",
+  "what": "Host lookup not found",
+  "fix": "Verify the target address or key exists before referencing it.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1203"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

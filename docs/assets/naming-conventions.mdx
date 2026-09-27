@@ -1,0 +1,167 @@
+---
+title: Naming Conventions
+description: Standardized naming for files, assets, and code throughout the Cowboy project
+icon: sliders
+---
+
+## Introduction
+
+Consistent naming improves discoverability, maintainability, and collaboration. These conventions apply to all Cowboy documentation, code, and assets.
+
+<Tip>
+  **Rule**: When in doubt, use kebab-case for files and snake_case for code
+</Tip>
+
+---
+
+## File Naming
+
+### Documentation Files (.mdx)
+
+**Format**: `kebab-case.mdx`
+
+**Rules (short)**:
+- Lowercase; use hyphens between words
+- Be descriptive; avoid overly generic names
+
+**Examples**:
+```
+✅ actor-vm-overview.mdx
+✅ dual-eip1559.mdx
+❌ ActorVMOverview.mdx
+❌ overview.mdx
+```
+
+### Diagram Files
+
+**Format**: `category-description.[svg|mmd|excalidraw|drawio]`
+
+**Examples**:
+```
+✅ architecture-system-overview.svg
+✅ sequence-message-flow.mmd
+❌ diagram1.svg
+```
+
+### Image Files
+
+**Format**: `kebab-case.[png|jpg|svg]`
+
+**Examples**:
+```
+✅ logo-dark.png
+✅ validator-dashboard.png
+❌ Logo.png
+❌ screenshot_1.png
+```
+
+---
+
+## Directory Naming
+
+### Documentation Directories
+
+**Format**: `kebab-case/` (match existing IA)
+
+**Examples**:
+```
+✅ architecture/
+✅ getting-started/
+✅ offchain/
+❌ Architecture/
+❌ getting_started/
+```
+
+
+## Code Naming (Python)
+
+### Files
+
+**Format**: `snake_case.py`
+
+```
+✅ token_actor.py
+❌ TokenActor.py
+```
+
+### Classes
+
+**Format**: `PascalCase`
+
+```
+✅ class TokenActor(Actor)
+❌ class token_actor(Actor)
+```
+
+### Functions/Methods
+
+**Format**: `snake_case`
+
+```
+✅ def get_balance(self, address)
+❌ def GetBalance(...)
+```
+
+### Variables
+
+**Format**: `snake_case` (constants use `UPPER_SNAKE_CASE`)
+
+```
+✅ user_balance = 100
+✅ MAX_GAS_LIMIT = 10_000_000
+❌ totalSupply
+```
+
+---
+
+## Terminology Standards
+
+### Cowboy-Specific Terms
+
+**Always Use** (capitalized when referring to Cowboy concepts):
+
+| Concept | ✅ Correct | ❌ Avoid |
+|---------|-----------|----------|
+| Compute unit | **Actor** | contract, smart contract |
+| Off-chain worker | **Runner** | oracle, worker |
+| Compute gas | **Cycles** | gas, compute |
+| Data gas | **Cells** | bytes, data |
+| Native token | **CBY** | Cowboy, token |
+
+
+### Abbreviations (minimal)
+
+Use common, project-wide forms (see Style Guide): VM, API, SDK, CLI, CBY, PoS, DoS, CIP.
+
+---
+
+### API Endpoints
+
+**Format**: `/api/v1/resource-name`
+
+```
+✅ /api/v1/validators/status
+❌ /api/v1/Actors/... 
+```
+---
+
+## Quick Reference Table
+
+| Context | Convention | Example |
+|---------|------------|---------|
+| **Documentation files** | kebab-case.mdx | `actor-vm-overview.mdx` |
+| **Diagram files** | category-name.svg | `architecture-overview.svg` |
+| **Python files** | snake_case.py | `token_actor.py` |
+| **Python classes** | PascalCase | `class TokenActor` |
+| **Python functions** | snake_case | `def transfer()` |
+| **Python constants** | UPPER_SNAKE_CASE | `MAX_CYCLES` |
+| **Directories** | kebab-case/ | `getting-started/` |
+| **URLs** | /kebab-case | `/architecture/actor-vm` |
+| **Git commits** | type: description | `docs: add guide` |
+| **Git branches** | type/issue-desc | `feat/123-new-api` |
+| **Version tags** | vX.Y.Z | `v0.1.0` |
+
+<Info>
+  This v0.1 guide focuses on the essentials to keep contributions fast and consistent. We will expand with edge cases in later milestones.
+</Info>
+

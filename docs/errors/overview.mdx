@@ -1,0 +1,229 @@
+---
+title: "Error Codes"
+description: "Complete reference of all 66 Cowboy Protocol error codes"
+---
+
+# Error Code Reference
+
+Every failed transaction receipt carries a **structured error** with a stable numeric code, a machine-readable slug, and human-authored remediation hints.
+
+## Error Format
+
+When a transaction fails, the receipt includes a structured error object:
+
+```json
+{
+  "code": 1202,
+  "slug": "E1202",
+  "category": "validation",
+  "what": "PVM execution error: Invalid input",
+  "why": "Address argument was not exactly 20 bytes.",
+  "fix": "Pass a 20-byte address (bytes or hex).",
+  "docs_url": "https://docs.cowboy.inc/errors/E1202",
+  "context": {
+    "exception_type": "AddressError",
+    "traceback": "..."
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `code` | Stable numeric identifier (never re-used) |
+| `slug` | Human-friendly shorthand (`E` + code) |
+| `category` | One of: `validation`, `runtime`, `gas`, `entitlement`, `token`, `timer`, `commit_reveal`, `runner`, `internal` |
+| `what` | One-line description of the error |
+| `why` | Root cause (SDK-authored if available, else Python exception message) |
+| `fix` | Actionable remediation hint |
+| `docs_url` | Link to this documentation page |
+| `context` | Additional key-value pairs (e.g., `traceback`, `expected`, `actual`) |
+
+## Code Ranges
+
+The registry contains **66 codes** across 8 categories:
+
+| Range | Category | Count |
+|-------|----------|-------|
+| E1000–E1099 | Transaction pre-checks | 9 |
+| E1100–E1199 | PVM static validation | 1 |
+| E1200–E1299 | PVM runtime / host API | 21 |
+| E1300–E1399 | Entitlements / manifest | 3 |
+| E1400–E1499 | CIP-20 tokens | 11 |
+| E1500–E1599 | Timers / deferred / commit-reveal | 8 |
+| E1600–E1699 | Runner / consensus / job | 12 |
+| E1900–E1999 | Internal / fallback | 1 |
+
+---
+
+## All Error Codes
+
+
+### E1000–E1099: Transaction Pre-checks
+
+Signature, nonce, basefee, and balance checks that run before the actor handler executes.
+
+| Code | Description | Category |
+|------|-------------|----------|
+| [`E1001`](/errors/E1001) | Invalid transaction signature | `validation` |
+| [`E1002`](/errors/E1002) | Nonce mismatch | `validation` |
+| [`E1003`](/errors/E1003) | Insufficient balance for value transfer | `validation` |
+| [`E1004`](/errors/E1004) | Insufficient balance for gas | `gas` |
+| [`E1005`](/errors/E1005) | Out of cycles | `gas` |
+| [`E1006`](/errors/E1006) | Out of cells | `gas` |
+| [`E1007`](/errors/E1007) | Gas calculation overflow | `gas` |
+| [`E1008`](/errors/E1008) | Basefee too low | `gas` |
+| [`E1009`](/errors/E1009) | Missing required signer | `validation` |
+
+
+### E1100–E1199: PVM Static Validation
+
+Compile-time determinism checks enforced at actor deploy.
+
+| Code | Description | Category |
+|------|-------------|----------|
+| [`E1101`](/errors/E1101) | Non-deterministic actor code | `validation` |
+
+
+### E1200–E1299: PVM Runtime / Host API
+
+Errors during actor execution — host calls, state access, and messaging.
+
+| Code | Description | Category |
+|------|-------------|----------|
+| [`E1201`](/errors/E1201) | Out of gas inside the PVM | `gas` |
+| [`E1202`](/errors/E1202) | Invalid input to host API call | `validation` |
+| [`E1203`](/errors/E1203) | Host lookup not found | `runtime` |
+| [`E1204`](/errors/E1204) | Backend storage error | `runtime` |
+| [`E1205`](/errors/E1205) | Operation forbidden | `runtime` |
+| [`E1206`](/errors/E1206) | Unclassified PVM-internal failure | `internal` |
+| [`E1207`](/errors/E1207) | Missing entitlement | `entitlement` |
+| [`E1208`](/errors/E1208) | Entitlement quota exceeded | `entitlement` |
+| [`E1210`](/errors/E1210) | Generic PVM execution error | `runtime` |
+| [`E1211`](/errors/E1211) | Caller is not authorized | `validation` |
+| [`E1212`](/errors/E1212) | Unsupported instruction/opcode | `validation` |
+| [`E1213`](/errors/E1213) | Input bytes failed schema validation | `validation` |
+| [`E1214`](/errors/E1214) | Serialization failure | `internal` |
+| [`E1220`](/errors/E1220) | Target actor does not exist | `runtime` |
+| [`E1221`](/errors/E1221) | Actor already exists at target address | `runtime` |
+| [`E1222`](/errors/E1222) | Target account does not exist | `runtime` |
+| [`E1223`](/errors/E1223) | Account already exists at target address | `runtime` |
+| [`E1224`](/errors/E1224) | Referenced message id does not exist | `runtime` |
+| [`E1225`](/errors/E1225) | Duplicate message id | `runtime` |
+| [`E1226`](/errors/E1226) | Target mailbox is full | `runtime` |
+| [`E1227`](/errors/E1227) | Persistent store error | `internal` |
+
+
+### E1300–E1399: Entitlements / Manifest
+
+Entitlement declaration and grant errors.
+
+| Code | Description | Category |
+|------|-------------|----------|
+| [`E1302`](/errors/E1302) | Invalid manifest | `entitlement` |
+| [`E1303`](/errors/E1303) | Non-system actor declared a system-only entitlement | `entitlement` |
+| [`E1304`](/errors/E1304) | Entitlement conflict | `entitlement` |
+
+
+### E1400–E1499: CIP-20 Tokens
+
+Fungible token operations — create, transfer, approve, hooks.
+
+| Code | Description | Category |
+|------|-------------|----------|
+| [`E1401`](/errors/E1401) | Token not found | `token` |
+| [`E1402`](/errors/E1402) | Token already exists | `token` |
+| [`E1403`](/errors/E1403) | Insufficient token balance | `token` |
+| [`E1404`](/errors/E1404) | Insufficient token allowance | `token` |
+| [`E1405`](/errors/E1405) | Token account is frozen | `token` |
+| [`E1406`](/errors/E1406) | Not authorized for this token operation | `token` |
+| [`E1407`](/errors/E1407) | Mint would exceed max_supply | `token` |
+| [`E1408`](/errors/E1408) | Transfer hook rejected the transfer | `token` |
+| [`E1409`](/errors/E1409) | Transfer hook attempted reentrancy | `token` |
+| [`E1410`](/errors/E1410) | Transfer hook execution failed | `token` |
+| [`E1411`](/errors/E1411) | Transfer hook exceeded gas cap | `gas` |
+
+
+### E1500–E1599: Timers / Deferred / Commit-Reveal
+
+Scheduled execution and commit-reveal protocol errors.
+
+| Code | Description | Category |
+|------|-------------|----------|
+| [`E1501`](/errors/E1501) | Timer limit exceeded for actor | `timer` |
+| [`E1502`](/errors/E1502) | Invalid deferred transaction | `validation` |
+| [`E1510`](/errors/E1510) | Commitment mismatch | `commit_reveal` |
+| [`E1511`](/errors/E1511) | Commit window closed | `commit_reveal` |
+| [`E1512`](/errors/E1512) | Reveal window not yet open | `commit_reveal` |
+| [`E1513`](/errors/E1513) | Reveal window closed | `commit_reveal` |
+| [`E1514`](/errors/E1514) | Runner already committed for this job | `commit_reveal` |
+| [`E1515`](/errors/E1515) | No commitment found for this runner | `commit_reveal` |
+
+
+### E1600–E1699: Runner / Consensus / Job
+
+Off-chain compute runner registration, job dispatch, and verification.
+
+| Code | Description | Category |
+|------|-------------|----------|
+| [`E1601`](/errors/E1601) | Runner already registered | `runner` |
+| [`E1602`](/errors/E1602) | Runner not found | `runner` |
+| [`E1603`](/errors/E1603) | Insufficient stake | `runner` |
+| [`E1604`](/errors/E1604) | Invalid job schema | `validation` |
+| [`E1605`](/errors/E1605) | Job not found | `runner` |
+| [`E1606`](/errors/E1606) | Runner not assigned to job | `runner` |
+| [`E1607`](/errors/E1607) | Insufficient runners available | `runner` |
+| [`E1608`](/errors/E1608) | No consensus reached | `runner` |
+| [`E1609`](/errors/E1609) | Threshold not met | `runner` |
+| [`E1610`](/errors/E1610) | Non-deterministic results | `runner` |
+| [`E1611`](/errors/E1611) | Unsupported verification mode | `runner` |
+| [`E1612`](/errors/E1612) | TEE required for deterministic mode | `runner` |
+
+
+### E1900–E1999: Internal / Fallback
+
+Unclassified errors — report with tx hash.
+
+| Code | Description | Category |
+|------|-------------|----------|
+| [`E1900`](/errors/E1900) | Unclassified error / fallback | `internal` |
+
+
+
+---
+
+## Reading Errors
+
+### From the CLI / RPC
+
+```bash
+curl -s http://localhost:4000/v1/transactions/<TX_HASH>/receipt | jq '.status'
+```
+
+### From a Python Actor
+
+```python
+import pvm_host
+
+try:
+    pvm_host.set_state(b"key", b"value")
+except pvm_host.HostError as e:
+    if e.name == "missing_entitlement":    # → E1207
+        ...
+    elif e.name == "entitlement_quota_exceeded":  # → E1208
+        ...
+    else:
+        raise
+```
+
+### Raising Structured Errors
+
+Use SDK exception classes for automatic structured error population:
+
+```python
+from cowboy_sdk.errors import AddressError, CodecError
+
+def transfer(self, payload):
+    if len(target) != 20:
+        raise AddressError(f"expected 20 bytes, got {len(target)}")
+    # → receipt: code=1202, slug=E1202, category=validation
+```

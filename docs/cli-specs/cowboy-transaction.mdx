@@ -1,0 +1,99 @@
+---
+title: "cowboy transaction"
+description: Submit and query transactions on the Cowboy blockchain
+icon: receipt
+---
+
+## Synopsis
+
+```bash
+cowboy transaction submit --data <hex>
+cowboy transaction get --hash <hex>
+cowboy transaction status --hash <hex>
+```
+
+## Subcommands
+
+### `cowboy transaction submit`
+
+Submit a raw signed transaction to the chain.
+
+**Behavior:**
+
+1. Take the hex-encoded transaction data.
+2. Submit it to the RPC endpoint.
+3. Print the transaction hash.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--data` | Required | Hex-encoded signed transaction |
+
+**Example:**
+
+```bash
+$ cowboy transaction submit --data 0xf86c...
+Transaction: 0xabc123...
+```
+
+---
+
+### `cowboy transaction get`
+
+Retrieve a transaction by its hash.
+
+**Behavior:**
+
+1. Query the RPC endpoint for the transaction with the given hash.
+2. Print the full transaction details (type, sender, nonce, payload).
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--hash` | Required | Transaction hash (hex) |
+
+**Example:**
+
+```bash
+$ cowboy transaction get --hash 0xabc123...
+Transaction: 0xabc123...
+  Type: Transfer
+  From: 0x7a3B...F92E
+  To: 0x1a2B...C3D4
+  Amount: 100 CBY
+  Nonce: 5
+  Status: confirmed
+  Block: 142
+```
+
+---
+
+### `cowboy transaction status`
+
+Query the status of a transaction.
+
+**Behavior:**
+
+1. Query the RPC endpoint for the transaction status.
+2. Print the status (pending, confirmed, failed).
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--hash` | Required | Transaction hash (hex) |
+
+**Example:**
+
+```bash
+$ cowboy transaction status --hash 0xabc123...
+Status: confirmed
+Block: 142
+```
+
+## Edge Cases
+
+- If the transaction hash is not found, print `Transaction not found`.
+- All subcommands are read-only except `submit`.

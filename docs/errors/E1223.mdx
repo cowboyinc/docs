@@ -1,0 +1,44 @@
+---
+title: "E1223 — Account already exists at target address"
+description: "Account already exists at target address"
+---
+
+# E1223 — Account already exists at target address
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1223` |
+| **Slug** | `E1223` |
+| **Category** | `runtime` (Runtime) |
+
+
+## What happened
+
+Account already exists at target address.
+
+## Why it happened
+
+An account creation attempted at an address that is already occupied.
+
+## How to fix
+
+Use a different address.
+
+## Receipt example
+
+```json
+{
+  "code": 1223,
+  "slug": "E1223",
+  "category": "runtime",
+  "what": "Account already exists at target address",
+  "fix": "Use a different address.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1223"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

@@ -1,0 +1,44 @@
+---
+title: "E1204 — Backend storage error"
+description: "Backend storage error"
+---
+
+# E1204 — Backend storage error
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1204` |
+| **Slug** | `E1204` |
+| **Category** | `runtime` (Runtime) |
+
+
+## What happened
+
+Backend storage error.
+
+## Why it happened
+
+An internal storage subsystem error occurred. This is usually transient.
+
+## How to fix
+
+Retry the transaction. If the error persists, report it with the tx hash — this indicates a backend fault.
+
+## Receipt example
+
+```json
+{
+  "code": 1204,
+  "slug": "E1204",
+  "category": "runtime",
+  "what": "Backend storage error",
+  "fix": "Retry the transaction.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1204"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

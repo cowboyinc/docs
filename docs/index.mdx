@@ -1,0 +1,160 @@
+---
+title: Welcome to Cowboy
+description: Cowboy Protocol - A Layer 1 blockchain for autonomous agents and verifiable computation
+icon: grip-vertical
+---
+
+<img
+  src="/images/banner.svg"
+/>
+
+Cowboy is a **Layer 1 blockchain** built for autonomous agents. Actors are written in **Python**, executed in a deterministic Rust-based VM, and can schedule **native timers**, call **off-chain services** (LLMs, HTTP, MCP), and read/write **encrypted distributed storage** — all with protocol-level guarantees and a **dual-metered gas model** that prices compute and storage independently.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quickstart"
+    icon="rocket"
+    href="/getting-started/quickstart"
+  >
+    Configure the CLI and deploy your first actor in a few commands
+  </Card>
+  <Card
+    title="What Makes Cowboy Different"
+    icon="lightbulb"
+    href="/introduction/what-is-cowboy"
+  >
+    What makes Cowboy different from other L1s
+  </Card>
+  <Card
+    title="Architecture Deep Dive"
+    icon="instalod"
+    href="/overview/architecture"
+  >
+    The technical design of the protocol end-to-end
+  </Card>
+  <Card
+    title="Source Layout"
+    icon="code-branch"
+    href="/getting-started/repo-layout"
+  >
+    Contributor tour of node, pvm, runner, cbfs, and more
+  </Card>
+</CardGroup>
+
+## Core Features
+
+<AccordionGroup>
+  <Accordion title="Python Smart Contracts" icon="python">
+    Actors are Python programs executed in a deterministic VM with fuel metering. The `cowboy_sdk` (CIP-6) provides an `@actor` decorator, persistent `self.storage`, asynchronous messaging, and a continuation FSM for off-chain jobs.
+
+    **Learn more:** [Actor VM](/architecture/actor-vm/overview) · [Minimal Actor](/architecture/actor-vm/minimal-actor)
+  </Accordion>
+
+  <Accordion title="Native Timers & Autonomous Execution" icon="clock">
+    Protocol-level timer support enables truly autonomous agents. Actors schedule their own execution via a hierarchical calendar queue with dynamic gas bidding (CIP-1).
+
+    **Learn more:** [Timers & Scheduler](/architecture/scheduler/overview)
+  </Accordion>
+
+  <Accordion title="Dual-Metered Gas Model" icon="gauge">
+    Compute (Cycles) and data (Cells) are priced independently with separate EIP-1559 fee markets. You pay fairly for what you actually use (CIP-3).
+
+    **Learn more:** [Fee Model](/architecture/fees/overview)
+  </Accordion>
+
+  <Accordion title="Verifiable Off-Chain Compute" icon="server">
+    Request LLM inference, HTTP calls, or MCP tool use from a runner network. Results are submitted on-chain with N-of-M, TEE, or ZK verification. VRF-based runner selection keeps it decentralized (CIP-2).
+
+    **Learn more:** [Off-Chain Compute](/architecture/offchain/overview)
+  </Accordion>
+
+  <Accordion title="Encrypted Distributed Storage (CBFS)" icon="hard-drive">
+    Large data lives in CBFS — a client-side-encrypted filesystem with Reed-Solomon erasure coding, QUIC transport, and a FUSE mount. Actors and runners attach volumes through delegated capability tokens (CIP-4 / CIP-9).
+
+    **Learn more:** [State Storage](/cips/cip-4-storage) · [Runner Storage](/cips/cip-9-runner-storage)
+  </Accordion>
+
+  <Accordion title="Ethereum-Compatible Keys" icon="ethereum">
+    Cowboy uses the same secp256k1 keypairs and 20-byte address scheme as Ethereum. Your existing keys, wallets, and signing tooling work without modification.
+
+    **Learn more:** [Key Format](/architecture/keys/key-format)
+  </Accordion>
+</AccordionGroup>
+
+## Getting Started
+
+<Steps>
+  <Step title="Understand the Basics">
+    Read [What is Cowboy?](/introduction/what-is-cowboy) to grasp the core concepts.
+  </Step>
+
+  <Step title="Deploy on Devnet">
+    Follow the [Quickstart](/getting-started/quickstart) to initialize the CLI and deploy a starter actor.
+  </Step>
+
+  <Step title="Deploy an Actor">
+    Deploy a minimal actor and call its handlers.
+  </Step>
+
+  <Step title="Build Something Real">
+    Study the [Examples Curriculum](/developers/examples) for state, permissions, actor messaging, timers, runner continuations, and LLM-backed actors.
+  </Step>
+</Steps>
+
+## For Different Audiences
+
+<CardGroup cols={3}>
+  <Card title="Application Developers" icon="laptop-code">
+    - [Quickstart](/getting-started/quickstart)
+    - [Minimal Actor](/architecture/actor-vm/minimal-actor)
+    - [Examples Curriculum](/developers/examples)
+  </Card>
+
+  <Card title="Protocol Researchers" icon="flask">
+    - [Architecture](/overview/architecture)
+    - [Scheduler](/architecture/scheduler/overview)
+    - [Off-Chain Compute](/architecture/offchain/overview)
+    - [Fee Model](/architecture/fees/overview)
+  </Card>
+
+  <Card title="Node Operators" icon="server">
+    - [Source Layout](/getting-started/repo-layout)
+    - [DoS Parameters](/architecture/scheduler/dos-parameters)
+    - [Off-Chain Compute](/architecture/offchain/overview)
+  </Card>
+</CardGroup>
+
+## A 30-Minute Path
+
+New to Cowboy? We recommend this learning path:
+
+1. **[What is Cowboy?](/introduction/what-is-cowboy)** — 5 min
+2. **[Quickstart](/getting-started/quickstart)** — deploy to the hosted devnet, ~10 min hands-on
+3. **[Minimal Actor](/architecture/actor-vm/minimal-actor)** — understand actor anatomy
+4. **[Examples Curriculum](/developers/examples)** — study runnable builder patterns
+
+From there, dive into [How Cowboy Works](/overview/architecture) for any pillar that interests you.
+
+## Protocol Status
+
+<Note>
+  **Current Version:** v0.1 (Devnet)
+  **Network Status:** Active development — devnet at `rpc-01.mesa.cowboylabs.net:4000`
+</Note>
+
+## Source
+
+<CardGroup cols={2}>
+  <Card title="GitHub" icon="github" href="https://github.com/cowboyinc/cowboy">
+    Source code, issues, and pull requests
+  </Card>
+  <Card title="Architecture" icon="sitemap" href="/overview/architecture">
+    Protocol design and system components
+  </Card>
+</CardGroup>
+
+---
+
+<Tip>
+  **Ready to build?** Jump to the [Quickstart](/getting-started/quickstart). Source contributors can explore the [Source Layout](/getting-started/repo-layout).
+</Tip>

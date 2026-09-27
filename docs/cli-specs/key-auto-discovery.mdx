@@ -1,0 +1,130 @@
+---
+title: Key Auto-Discovery
+description: How the CLI finds private keys and RPC URLs automatically
+icon: key
+---
+
+## Overview
+
+Every command that needs a private key follows the same lookup order. This avoids requiring `--private-key` on every command while still allowing explicit overrides.
+
+## Private Key Lookup Order
+
+1. **`--private-key <path>`** flag (if provided) -- Use this file directly.
+2. **`COWBOY_PRIVATE_KEY` environment variable** -- If set, treat the value as a hex-encoded 32-byte private key.
+3. **`.cowboy/config.json`** -- Read `key_file` from the active environment, resolved relative to `.cowboy/`.
+4. **`.cowboy/key`** -- Fallback for backward compatibility (walk up from the current directory to find the nearest `.cowboy/key` file, same pattern as `.git/` discovery).
+
+If none of these produce a key, the command prints an error:
+
+```
+Error: No private key found.
+  Provide --private-key <path>, set COWBOY_PRIVATE_KEY, or run 'cowboy wallet create' to generate .cowboy/key
+```
+
+## Key File Formats
+
+The CLI supports two key file formats and auto-detects which is in use:
+
+**PEM format (current default):**
+
+```
+-----BEGIN COWBOY PRIVATE KEY-----
+Curve: secp256k1
+Checksum: abc123...
+
+base64-encoded-key-bytes
+-----END COWBOY PRIVATE KEY-----
+```
+
+**Hex format (backward compatible):**
+
+```
+a1b2c3d4e5f6...  (64 hex characters, no 0x prefix, no newlines)
+```
+
+The `0x` prefix is accepted but not required for hex format. Trailing newlines are trimmed. Use `cowboy wallet upgrade` to convert hex keys to PEM format.
+
+## Directory Walking
+
+The CLI searches for `.cowboy/` starting from the current working directory and walking up to the filesystem root:
+
+```
+/home/user/projects/myapp/        # Check here first
+/home/user/projects/               # Then here
+/home/user/                        # Then here
+/home/                             # Then here
+/                                  # Stop
+```
+
+This allows nested directories within a project to find the project-level key.
+
+## RPC URL Discovery
+
+The same pattern applies to the RPC URL:
+
+1. **`--rpc-url <url>`** flag (if provided).
+2. **`COWBOY_RPC_URL` environment variable**.
+3. **`.cowboy/config.json`** file (read `rpc_url` from the active environment).
+4. **Default:** `http://localhost:4000`.
+
+The `config.json` format (multi-environment):
+
+```json
+{
+  "active": "local",
+  "environments": {
+    "local": {
+      "rpc_url": "http://localhost:4000",
+      "key_file": "keys/local"
+    },
+    "dev": {
+      "rpc_url": "http://rpc-01.mesa.cowboylabs.net:4000",
+      "key_file": "keys/dev"
+    }
+  }
+}
+```
+
+The legacy flat format is also supported:
+
+```json
+{
+  "network": "local",
+  "rpc_url": "http://localhost:4000"
+}
+```
+
+## Commands Using Auto-Discovery
+
+**Every command that needs a private key or RPC URL uses auto-discovery.** This is
+critical for the zero-config promise -- after `cowboy init dev` or `cowboy init local`,
+commands use the configured key and network without extra flags.
+
+| Command | Discovers key | Discovers RPC URL |
+|---------|:---:|:---:|
+| `cowboy wallet address` | Yes | -- |
+| `cowboy wallet balance` | Yes | Yes |
+| `cowboy wallet upgrade` | Yes | -- |
+| `cowboy actor deploy` | Yes | Yes |
+| `cowboy actor execute` | Yes | Yes |
+| `cowboy actor get` | -- | Yes |
+| `cowboy actor logs` | -- | Yes |
+| `cowboy transfer` | Yes | Yes |
+| `cowboy account *` | -- | Yes |
+| `cowboy transaction submit` | -- | Yes |
+| `cowboy transaction get/status` | -- | Yes |
+| `cowboy block *` | -- | Yes |
+| `cowboy query *` | -- | Yes |
+| `cowboy runner register` | Yes | Yes |
+| `cowboy runner get/list` | -- | Yes |
+| `cowboy job submit` | Yes | Yes |
+| `cowboy job get/status/runners/results/verified` | -- | Yes |
+| `cowboy token create/transfer/approve/mint/burn/freeze/unfreeze` | Yes | Yes |
+| `cowboy token info/balance/list` | -- | Yes |
+| `cowboy watchtower init` | Yes | Yes |
+| `cowboy watchtower new feed` | Yes | Yes |
+| `cowboy watchtower feed <id> publish` | Yes | Yes |
+| `cowboy watchtower feeds` | Yes | Yes |
+| `cowboy watchtower list` | -- | Yes |
+| `cowboy watchtower feed <id> subscribers` | -- | Yes |

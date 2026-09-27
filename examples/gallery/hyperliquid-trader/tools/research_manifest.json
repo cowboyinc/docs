@@ -1,0 +1,7 @@
+{ "name": "hl-research", "version": "0.1.0",
+  "entitlements": [
+    { "id": "http.fetch" },
+    { "id": "oracle.llm" },
+    { "id": "storage.kv" },
+    { "id": "timer.schedule" }
+  ] }

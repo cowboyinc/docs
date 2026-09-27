@@ -1,0 +1,11 @@
+[project]
+name = "cowboy-example-agentmail-inbox"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = []
+[dependency-groups]
+dev = ["cbor2", "pytest"]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = [".", "tests", "tools", "../.."]

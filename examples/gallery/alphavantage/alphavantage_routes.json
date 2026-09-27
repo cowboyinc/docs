@@ -1,0 +1,25 @@
+{
+  "base": "https://www.alphavantage.co/query",
+  "source": "https://www.alphavantage.co/documentation/",
+  "secret_key": "ALPHAVANTAGE_API_KEY",
+  "auth": {"in": "query", "name": "apikey"},
+  "functions": {
+    "quote": {"function": "GLOBAL_QUOTE", "required": "Global Quote", "extract": null},
+    "daily": {"function": "TIME_SERIES_DAILY", "required": "Time Series (Daily)", "extract": null},
+    "overview": {"function": "OVERVIEW", "required": "Symbol", "extract": null}
+  },
+  "request_bounds": {
+    "daily_outputsize": ["compact"],
+    "runner_result_bytes": 65536,
+    "runner_data_target_bytes": 60000
+  },
+  "excluded_transport_unsafe": [
+    "INCOME_STATEMENT / BALANCE_SHEET / CASH_FLOW (~122KB)",
+    "NEWS_SENTIMENT (~125KB)",
+    "TIME_SERIES_MONTHLY (full history)",
+    "TIME_SERIES_DAILY outputsize=full",
+    "TIME_SERIES_WEEKLY",
+    "quarterlyReports from financial statements"
+  ],
+  "demo_probe": {"function": "GLOBAL_QUOTE", "symbol": "IBM", "required": "Global Quote"}
+}

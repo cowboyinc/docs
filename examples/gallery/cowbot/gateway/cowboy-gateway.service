@@ -1,0 +1,31 @@
+[Unit]
+Description=Cowboy Gateway (cowbot devnet)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cowboy-gateway
+Group=cowboy-gateway
+WorkingDirectory=/opt/cowboy-gateway
+ExecStart=/opt/cowboy-gateway/bin/gateway --config /opt/cowboy-gateway/gateway.toml
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+# Read-only filesystem hardening, matching the upstream
+# gateway/systemd/gateway.service template.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+# Keypair lives under /var/lib/cowboy-gateway and is read-only at
+# runtime; logs go to journald (no extra ReadWritePaths needed).
+ReadOnlyPaths=/var/lib/cowboy-gateway
+
+# We bind 127.0.0.1:8080 — no privileged port, no NET_BIND_SERVICE.
+
+Environment=RUST_LOG=info,gateway=debug
+
+[Install]
+WantedBy=multi-user.target

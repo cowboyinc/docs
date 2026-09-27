@@ -1,0 +1,28 @@
+{
+  "cip33_schema": 1,
+  "name": "inference",
+  "summary": "OpenAI-compatible Cowboy inference with named API keys and per-hire usage. OpenRouter is the first supported client.",
+  "implementation_status": "Pre-launch handler and actor configuration scaffold; native admission and deployment wiring remain required.",
+  "badges": {"human_hireable": true, "agent_hireable": true},
+  "methods": [
+    {
+      "name": "models",
+      "caller": "API key holder for an eligible hire",
+      "http": {"verb": "GET", "path": "/v1/models"},
+      "params": {"type": "object", "additionalProperties": false},
+      "result": {"type": "object", "required": ["object", "data"], "properties": {"object": {"const": "list"}, "data": {"type": "array", "items": {"type": "object", "required": ["id", "object"], "properties": {"id": {"type": "string"}, "object": {"const": "model"}}}}}}
+    },
+    {
+      "name": "chat_completions",
+      "caller": "API key holder for an eligible hire",
+      "http": {"verb": "POST", "path": "/v1/chat/completions"},
+      "params": {"type": "object", "required": ["model", "messages"], "properties": {"model": {"type": "string"}, "messages": {"type": "array", "minItems": 1, "items": {"type": "object"}}, "stream": {"type": "boolean"}}},
+      "result": {"description": "OpenAI-compatible chat completion JSON, or SSE chunks for stream=true. The exact accepted parameter subset is defined by offchain/inference.py."}
+    }
+  ],
+  "management": {"page": "/manage?slot=<slot>", "authentication": "Wallet proof independently verified against retained hire state", "routes": "route-intent.json", "data": "One creator-owned CBFS volume per hire"},
+  "pricing_terms": [{"type": "Free"}],
+  "runner_requirements": {"execution": "Native RunnerRoute with pinned offchain bundle and runtime", "serving": "Operator-configured OpenAI-compatible serving endpoints; no client-supplied target URLs", "storage": "Atomic durable CBFS manifest CAS", "limits": "Finite per-route, per-session and actor sponsorship bounds are required deployment inputs"},
+  "rate_limits": {"active_keys_per_hire_default": 8, "active_keys_per_hire_max": 100, "configured_slots_max": 128, "usage_range_days_max": 31},
+  "secrets": {"api_key_storage": "Only public metadata and a SHA-256 secret hash", "issuer": "CBSS signing key released only to the create-key job", "metering": "Separate CBSS voucher signing key released to the assigned session job"}
+}

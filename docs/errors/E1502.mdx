@@ -1,0 +1,44 @@
+---
+title: "E1502 — Invalid deferred transaction"
+description: "Invalid deferred transaction"
+---
+
+# E1502 — Invalid deferred transaction
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1502` |
+| **Slug** | `E1502` |
+| **Category** | `validation` (Validation) |
+
+
+## What happened
+
+Invalid deferred transaction.
+
+## Why it happened
+
+The deferred transaction was not declared in the origin receipt and does not carry a same-block commitment.
+
+## How to fix
+
+Deferred transactions must be declared in the origin receipt or carry a same-block commitment.
+
+## Receipt example
+
+```json
+{
+  "code": 1502,
+  "slug": "E1502",
+  "category": "validation",
+  "what": "Invalid deferred transaction",
+  "fix": "Deferred transactions must be declared in the origin receipt or carry a same-block commitment.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1502"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

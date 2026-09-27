@@ -1,0 +1,46 @@
+---
+title: cowboy watchtower
+description: Watchtower replacement CLI contract and implementation status.
+---
+
+# cowboy watchtower
+
+<Note>
+The [CIP-7 replacement](/cips/cip-7-simple-stream-protocol) is a draft protocol awaiting coordinated node/service/SDK/CLI implementation. The operations below are required capabilities, not commands already available in released binaries. Only disposable devnet exists; no old epoch-key command compatibility is required.
+</Note>
+
+## Feed management
+
+The CLI must initialize ANCHORED or CONSENSUS feeds with an authenticated provider owner, fixed scales and tariff, and registered signing/usage keys. ANCHORED initialization binds a dedicated CBQS stream and Watchtower service. The CLI must validate protocol limits before signing, without claiming that local validation replaces chain admission.
+
+Expose config, committed head, retained anchors, generation/key history and capacity. Distinguish an anchored head from the service's provisional live head. Rotation must stop publishing, finalize the current boundary, wait for pending wake jobs to drain, and update generation only after the chain confirms it.
+
+## Publish and read
+
+External publishers encode and sign the exact CIP-7 envelope. ANCHORED append uses the Watchtower service and CBQS/CBFS; CONSENSUS publish submits an owner-authorized actor call. Persist the signed envelope before sending, recover the same bytes after an uncertain append, and never sign another body at the same sequence.
+
+Read commands accept publisher sequence and return the bounded replay page plus its continuation cursor. The implementation must use the provider's publisher-sequence/CBQS-position mapping, deduplicate identical records, stop on gaps/conflicts and verify CBFS body hashes. A cursor below all retained data returns CURSOR_TOO_OLD; do not silently restart at head.
+
+## Usage authorization and keys
+
+Expose authorize, inspect and revoke operations for one cumulative usage allowance per subscriber/feed. Show total authorized amount, settled amount, generation, authorization ID, expiry and current available account balance separately: an allowance is not a funded deposit.
+
+Paid consumers authenticate to the Watchtower service and obtain authorized generation/epoch keys over a confidential channel. They verify the epoch formula, AEAD AAD, signature and body hash. The publisher's root secret remains local to its trusted signing/key service.
+
+## Actor wake
+
+Expose subscription inspection and authenticated actor calls for guard, callback, evidence policy, callback gas bounds and cumulative wake allowance. Fixed-point literals must be exactly representable; reject implicit rounding.
+
+Show bounded job outcomes, skipped/unfunded recipients and failed callbacks. PROVISIONAL and ANCHORED FINALIZED both carry publisher-honesty risk; strict anti-equivocation actions use CONSENSUS. Failed callbacks are consumed and not automatically retried. CLI payloads cannot impersonate an actor by naming its address.
+
+## Retired commands
+
+CIP-7 account-key registration, epoch access purchases, content-key prewrap/registration and CBSS partial aggregation are removed with the replacement. `0x0D` remains permanently reserved. The old `register-keys`, `acquire-access` and wrapped-key delivery workflow must not be advertised as current Watchtower functionality. CIP-24/CIP-9 secret tools remain separate.
+
+## Acceptance
+
+CLI help, payload bytes and SDK vectors must match [CIP-7 interfaces](/cips/cip-7-simple-stream-protocol#interfaces-and-outcomes). Validate interrupted publish recovery, authenticated key delivery, replay gaps, rotation and bounded wake through real components before marking this page implemented. Automated ingestion/signing bridges, provider failover and batch anchors are outside v1.
+
+## SDK reference during replacement
+
+The [generated SDK reference](/developers/sdk-reference) records source-extracted APIs, including the old stream and Watchtower helpers while they remain in node. Its presence does not declare conformance to this replacement. Remove or replace those helpers in the coordinated node/SDK implementation, then regenerate the reference with `docs/scripts/gen_sdk_reference.py`; do not hand-edit generated entries. The replacement requires canonical signing and verification, generation-bound content-key derivation, authenticated usage authorization, Merkle proofs, fixed-point guards and bounded callbacks as specified by CIP-7. Old committee/SealRequest delivery and four-argument content-key derivation are not replacement interfaces.

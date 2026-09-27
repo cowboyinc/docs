@@ -1,0 +1,58 @@
+{
+  "cip33_schema": 1,
+  "name": "ranchhand",
+  "summary": "Multi-tenant Slack assistant. Hire it, connect your own Slack workspace, and it answers @mentions and DMs with conversation memory — your workspace credentials stay under your account, released only to your own credential-proxy actor.",
+  "badges": { "human_hireable": true, "agent_hireable": false },
+  "methods": [
+    {
+      "name": "connect_workspace",
+      "caller": "hirer (signed tx)",
+      "params": {
+        "type": "object",
+        "required": ["team_id", "hire_id", "proxy", "state_volume"],
+        "properties": {
+          "team_id": { "type": "string", "description": "Slack workspace team id (T…)" },
+          "hire_id": { "type": "integer", "description": "Trading Post hire id" },
+          "proxy": { "type": "string", "description": "hirer's deployed slackrelay proxy actor address (0x…)" },
+          "state_volume": { "type": "string", "description": "per-hire CBFS state volume name (provisioned by the creator at connect time)" }
+        }
+      },
+      "result": { "type": "string", "const": "ok: workspace connected" }
+    },
+    {
+      "name": "disconnect_workspace",
+      "caller": "hirer (signed tx)",
+      "params": {
+        "type": "object",
+        "required": ["team_id"],
+        "properties": { "team_id": { "type": "string" } }
+      },
+      "result": { "type": "string" }
+    }
+  ],
+  "webhooks": [
+    {
+      "path": "/slack/events",
+      "verb": "POST",
+      "description": "Slack Events API request URL (all tenants share it; routing is by team_id). Point your Slack app's event subscription here.",
+      "authentication": "Slack v0 HMAC, verified runner-side against YOUR signing secret via your credential proxy (CIP-24 §5.5); the listed actor never holds it."
+    }
+  ],
+  "hirer_setup": {
+    "description": "Post-hire onboarding (scripted by connect-workspace.sh): create a Slack app from the provided manifest, store RANCHHAND_SLACK_SIGNING_SECRET + RANCHHAND_SLACK_BOT_TOKEN as CBSS secrets under your account, deploy your slackrelay proxy (manifest names exactly those two keys), ACL both secrets to the proxy, then call connect_workspace.",
+    "secrets_held_by_listed_actor": []
+  },
+  "pricing_terms": [{ "type": "Free" }],
+  "runner_requirements": {
+    "verbs": ["agent", "http"],
+    "models": ["local"],
+    "mounts": [
+      { "volume": "artifact (pinned)", "mode": "ro", "release": "CIP-33 key lease (hire-bound jobs only)" },
+      { "volume": "per-hire state", "mode": "rw", "release": "CIP-9 account path" }
+    ]
+  },
+  "rate_limits": {
+    "per_thread": "single in-flight request",
+    "global_dispatch_cap": 100000
+  }
+}

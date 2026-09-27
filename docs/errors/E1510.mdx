@@ -1,0 +1,44 @@
+---
+title: "E1510 — Commitment mismatch"
+description: "Commitment mismatch"
+---
+
+# E1510 — Commitment mismatch
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1510` |
+| **Slug** | `E1510` |
+| **Category** | `commit_reveal` (Commit-Reveal) |
+
+
+## What happened
+
+Commitment mismatch.
+
+## Why it happened
+
+The revealed value does not hash to the stored commitment.
+
+## How to fix
+
+Re-commit with the correct value, or correct the reveal to match the commitment.
+
+## Receipt example
+
+```json
+{
+  "code": 1510,
+  "slug": "E1510",
+  "category": "commit_reveal",
+  "what": "Commitment mismatch",
+  "fix": "Re-commit with the correct value, or correct the reveal to match the commitment.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1510"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

@@ -1,0 +1,170 @@
+---
+title: "Testing Actors"
+description: "Unit-test actors off-chain with SimulatedChain and mock_host, then verify against devnet"
+icon: vial
+---
+
+## Overview
+
+Actors are deterministic Python, which makes them very testable: the SDK can stub the entire PVM host API in-process, so handlers run as plain functions under pytest — no validator, no Docker, sub-second feedback.
+
+This guide covers the three layers of the testing ladder:
+
+1. **Unit tests** with `SimulatedChain` — state, events, timers, determinism
+2. **Mocking cross-actor calls** with `CallMock`
+3. **Integration runs** against a real devnet
+
+## 1. Unit testing with SimulatedChain
+
+`cowboy_sdk.testing.SimulatedChain` is an in-memory, single-actor harness built on `cowboy_sdk.mock_host`. Constructing one installs the mock host (so `import pvm_host` resolves to it), resets state, and gives you a driveable chain:
+
+```python
+from cowboy_sdk.testing import SimulatedChain
+
+import main  # your actor module
+
+
+def test_counter_flow():
+    chain = SimulatedChain(main.Counter())
+
+    chain.call("init")
+    chain.call("increment")
+    chain.call("increment")
+
+    # Assert persisted state directly (raw stored bytes: CBOR-encoded 2)
+    chain.assert_state("count", b"\x02")
+
+    # Or read it back
+    raw = chain.state("count")
+
+    # Events emitted via runtime.emit_event are captured
+    assert chain.events()[-1][0] == "counter.incremented"
+```
+
+What the harness gives you:
+
+| Method | Purpose |
+|---|---|
+| `chain.call(handler, payload=b"")` | Invoke a handler by name (or pass a callable) |
+| `chain.state(key)` / `chain.assert_state(key, expected)` | Read / assert raw stored bytes |
+| `chain.snapshot()` | Full state dict, for golden comparisons |
+| `chain.events()` | All `(name, payload)` events emitted so far |
+| `chain.set_sender(addr)` / `chain.set_block_height(n)` | Control execution context |
+| `chain.advance_block(n)` | Advance the clock, firing any due timers into their handlers |
+| `chain.check_determinism(scenario)` | Replay a scenario on two fresh chains and compare snapshots |
+
+### Testing timers
+
+`advance_block` fires every timer whose height is due and routes it to the handler named in the timer payload — so scheduled behavior is testable without a validator:
+
+```python
+def test_timer_ticks():
+    chain = SimulatedChain(main.TimerCounter())
+    chain.call("init", b'{"interval_blocks": 5, "max_ticks": 2}')
+    chain.call("start")
+
+    fired = chain.advance_block(5)   # [(handler, result), ...]
+    assert fired and fired[0][0] == "on_timer"
+```
+
+### Determinism checks
+
+Same scenario, two fresh chains, identical final state — a cheap guard against accidentally nondeterministic code (iteration order, time, randomness):
+
+```python
+def test_deterministic():
+    def scenario(chain):
+        chain.call("init")
+        chain.call("increment")
+
+    assert SimulatedChain(main.Counter()).check_determinism(scenario)
+```
+
+## 2. Mocking cross-actor calls
+
+When your actor calls other actors, stub the responses with `CallMock` — a matcher-based mock for the host's `call` operation. Note that `cowboy_sdk.call()` encodes arguments and decodes responses with the call's codec — canonical CBOR unless you pass `codec=`, per [CIP-6 §9.5](/cips/cip-6-sdk) — so matchers and responses are expressed in encoded bytes:
+
+```python
+from cowboy_sdk import call, codec, mock_host
+from cowboy_sdk.testing import CallMock
+
+mock = CallMock(default=codec.encode(None))
+mock.when(method="get_price", args=codec.encode("ETH")).respond(codec.encode(3000))
+mock_host.set_call_handler(mock)
+
+price = call(b"\x11" * 20, "get_price", "ETH")   # → 3000
+
+# Afterwards, inspect what your actor called:
+assert mock.calls[0][1] == "get_price"
+```
+
+Rules match on any combination of `target`, `method`, `args` (exact equality on the encoded bytes) or a custom `predicate`; unmatched calls get the default. Every call is recorded in `mock.calls` as `(target, method, args, cycles_limit)`.
+
+## 3. Wiring it into pytest
+
+Install the mock host early — before any actor module is imported — so every `pvm_host` lookup resolves to it. `SimulatedChain` does this on construction; for suites that import actor modules at collection time, do it in `conftest.py`:
+
+```python
+# conftest.py
+import sys
+from cowboy_sdk import mock_host
+
+sys.modules["pvm_host"] = mock_host
+
+import pytest
+
+@pytest.fixture(autouse=True)
+def fresh_host():
+    mock_host.reset()
+    yield
+    mock_host.reset()
+```
+
+Then run with the SDK available in your Python test environment. If you are working from a full source checkout, expose **only the `cowboy_sdk` package**; do not add the PVM's entire Python standard library to `PYTHONPATH`, because it can shadow CPython's stdlib and break pytest:
+
+```bash
+pytest actors/counter/
+```
+
+<Tip>
+  `mock_host.reset()` between tests is essential — state, timers, and context are module-level in the mock. The autouse fixture above keeps tests independent.
+</Tip>
+
+`mock_host.set_context(...)` lets you fake execution-context fields (sender, tx hash, ...) when a handler branches on them; for the block clock, use `set_block_height()` (or `SimulatedChain`'s helpers), which is what timers and `runtime.get_block_height()` follow.
+
+## 4. Integration: run against a real devnet
+
+Unit tests don't exercise CBOR boundaries with the real host, gas metering, or the scheduler's actual dispatch. Once unit tests pass, run the actor on the configured devnet:
+
+```bash
+# Configure devnet (see Quickstart) and deploy
+cowboy actor deploy --code actors/counter/main.py --salt 0x01
+cowboy actor execute --actor <ADDR> --handler increment --payload 0x
+cowboy actor logs --address <ADDR>
+```
+
+For source-checkout examples there is a shared sweep harness that can spawn a temporary isolated validator per run:
+
+```bash
+cd examples
+./run_examples.sh --spawn-local           # temporary local validator
+./run_examples.sh --server local core/07-timers-and-automation   # reuse a validator you already run
+```
+
+## What to test at which layer
+
+| Concern | SimulatedChain | Devnet |
+|---|:---:|:---:|
+| Handler logic, state transitions | ✓ | |
+| Events | ✓ | |
+| Timer scheduling logic | ✓ | ✓ |
+| Cross-actor protocols | mocked | ✓ |
+| Gas (Cycles/Cells) behavior | | ✓ |
+| Runner jobs / continuations | mocked | ✓ |
+| Determinism | `check_determinism` | consensus itself |
+
+## Further reading
+
+- [Your First Actor](/developers/your-first-actor) — the tutorial these snippets come from
+- [Determinism & Sandbox](/architecture/actor-vm/determinism-and-sandbox) — what the PVM enforces
+- [Resource Limits](/architecture/actor-vm/resource-limits) — Cycles/Cells limits you'll meet on a real chain

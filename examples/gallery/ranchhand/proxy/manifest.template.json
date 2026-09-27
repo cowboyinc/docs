@@ -1,0 +1,26 @@
+{
+  "entitlements": [
+    {
+      "id": "http.fetch",
+      "params": {
+        "allowlist_domains": ["SLACK_API_DOMAIN"],
+        "max_requests": 8
+      }
+    },
+    {
+      "id": "secrets.read",
+      "params": {
+        "keys": ["HIRER_EOA:RANCHHAND_SLACK_BOT_TOKEN"]
+      }
+    },
+    {
+      "id": "secrets.verify",
+      "params": {
+        "keys": ["HIRER_EOA:RANCHHAND_SLACK_SIGNING_SECRET"]
+      }
+    },
+    {
+      "id": "storage.kv"
+    }
+  ]
+}

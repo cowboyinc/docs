@@ -1,0 +1,48 @@
+{
+ "_note": "CIP-15 \u00a78.14 Runner-route caller auth, ratified form (dashboard-impl #355/#357). Fixed private key for reproducibility; RFC 6979 makes the signature deterministic.",
+ "domain_tag": "cowboy/cip15/runner-route-auth/v1",
+ "cbor_fields_in_order": [
+  "chain_id:uint",
+  "network:text",
+  "actor:bstr20",
+  "verb:text",
+  "handler:text",
+  "raw_target:bstr",
+  "body_sha256:bstr32",
+  "expiry:uint",
+  "nonce:bstr"
+ ],
+ "request": {
+  "chain_id": 9999,
+  "network": "canyon",
+  "actor_hex": "00112233445566778899aabbccddeeff00112233",
+  "verb": "POST",
+  "handler": "offchain.manage.Management.handle",
+  "raw_target": "/manage/api/keys?slot=cloud",
+  "body_hex": "7b226e616d65223a226f70656e726f75746572227d",
+  "body_sha256_hex": "a49e3f253c81a208e7bb816e44233bb2527feec7864f76b5300f4cfe39a2b32a",
+  "expiry": 1757600000,
+  "nonce_hex": "0102030405060708090a0b0c0d0e0f10"
+ },
+ "private_key_hex": "4c0883a69102937d6231471b5dbb6204fe5129617082792ae468d01a3f362318",
+ "preimage_hex": "636f77626f792f63697031352f72756e6e65722d726f7574652d617574682f76318919270f6663616e796f6e5400112233445566778899aabbccddeeff0011223364504f535478216f6666636861696e2e6d616e6167652e4d616e6167656d656e742e68616e646c65581b2f6d616e6167652f6170692f6b6579733f736c6f743d636c6f75645820a49e3f253c81a208e7bb816e44233bb2527feec7864f76b5300f4cfe39a2b32a1a68c2d900500102030405060708090a0b0c0d0e0f10",
+ "digest_hex": "e29d4beee63afdff3a0ec84cd673c9f84887dc58e2f395102bfa43c34ca66539",
+ "signature_hex": "8985b96bb5e4f2ac26efac9efdb1d9f34f3387c7b6e64432177a4b26b7c2e6a329a1d50d32996aa3821e938bb75d089ed8c1f3ca5da0a28748dc8a082828446a01",
+ "recid": 1,
+ "address_hex": "2c7536e3605d9c16a7a3d7b1898e529396a65c23",
+ "claim_key_hex": "78575e09d15a5e6d17daa5e6ba9aec752cdc7e0e4d9fbee74d7b5ce22c3d8cfb",
+ "validity": {
+  "accept_iff": "now <= expiry <= now + 3600",
+  "claim_retention_s_after_expiry": 300,
+  "claim_key": "sha256(CBOR([chain_id, network, actor, recovered_caller, nonce]))",
+  "recid": "raw 0..3, 27/28 rejected",
+  "low_s": true
+ },
+ "headers": {
+  "x-cowboy-account-sig": "base64url(signature)",
+  "x-cowboy-account-expiry": "decimal",
+  "x-cowboy-account-nonce": "base64url(nonce)",
+  "x-cowboy-account-chain-id": "decimal",
+  "x-cowboy-account-network": "text"
+ }
+}

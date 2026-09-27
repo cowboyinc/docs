@@ -1,0 +1,95 @@
+---
+title: "Resource Limits"
+description: "Resource limiting mechanisms in Actor VM"
+---
+
+# Resource Limits
+
+The Actor VM enforces layered, deterministic resource limits to ensure safety, fairness, and consensus across clients. Limits are expressed along two orthogonal dimensions — Cycles (compute) and Cells (data) — and are complemented by strict execution constraints that make Python-on-chain deterministic.
+
+> Note: Names and examples in this page are conceptual and illustrative. Final interfaces and usage should follow the SDK and Developer Guide; CIP specifications define normative protocol behavior.
+> Scope
+> - What is limited: compute, data, module imports, numeric ranges, async scheduling, and timers.
+> - Where it is enforced: at the VM instruction loop, host function boundaries, transaction ingress/egress, and block-level scheduler.
+
+## Resource dimensions
+
+### Cycles (compute)
+- Unit: an abstract instruction step. Charged before executing each Python bytecode and on selected control-flow/runtime events.
+- Enforced under protocol-defined cycles limits for execution; when exhausted, execution halts with an Out of Cycles error.
+- Partial cost table (consensus-critical; see CIP-3):
+
+| Operation Type | Cycles Cost |
+| :---- | ----: |
+| Python Arithmetic Ops (+, -, *, /, %) | 1 |
+| Python Function Call | 10 |
+| Dictionary Get/Set | 3 |
+| List Append/Access | 2 |
+| String Operation (per character) | 1 |
+| Mailbox Send (per message, payload extra) | 80 |
+| Set/Cancel Timer | 200 |
+| Commit Blob (per KiB) | 40 |
+| Storage KV Read (per call) | 10 |
+| Storage KV Write (per call) | 50 |
+| Cryptography (secp256k1 signature verification) | 3,000 |
+| Cryptography (BLS signature verification) | 8,000 |
+| Hashing (keccak256, per 32 bytes) | 6 |
+
+Dynamic surcharges (CIP-3): for type/size-dependent operations, a base cost is charged plus a runtime surcharge (e.g., string/list concatenation proportional to length).
+
+### Cells (data)
+- Unit: 1 Cell = 1 byte. Charged at I/O boundaries via host functions and at transaction ingress/egress.
+- Enforced as `cells_limit` per transaction. When exhausted, execution halts with an Out of Cells error.
+- Metering points (CIP-3):
+  - Intrinsic calldata: charged before VM execution (payload size).
+  - Host functions: data-bearing calls must charge the exact byte count.
+    - `storage_set(key, value)`: `len(key) + len(value)` Cells.
+    - `put_blob(data)`: `len(data)` Cells.
+  - Scratch `/tmp`: immediate charge on file writes by number of bytes.
+  - Return data: charged after a successful handler return by byte size.
+
+## Deterministic execution constraints (consensus-critical)
+
+These constraints are mandatory to keep all clients in lockstep (CIP-3):
+
+- No JIT compilation: the VM executes in pure interpretation mode.
+- No arbitrary C extensions: high-performance needs are exposed as deterministic, metered host functions.
+- Module import whitelist only:
+  - Import cost: 100 cycles on first import (+ module init cost), 5 cycles on repeated imports within the same transaction.
+  - Importing a disallowed module raises `ImportError` and consumes 50 cycles penalty.
+- Floating-point determinism: all FP ops must use a version-locked software library; native FPU use is forbidden.
+- Big integer cap: integer bit length must not exceed 4096 bits; operations exceeding the cap raise `OverflowError`. Large-int costs scale with operand bit length.
+- Exception handling is explicitly metered: raising, entering try blocks, and jumping into except/finally each have base costs.
+- Async/await scheduling is single-threaded and deterministic: strict FIFO of ready coroutines; no true concurrency; no nondeterministic gather patterns.
+- Canonical serialization for messages/state: deterministic encoding with lexicographically sorted dict keys; floats serialized by exact IEEE-754 bits.
+
+## Timers and block-level budgets
+
+Timers are delivered and executed under a per-block budget (CIP-1):
+
+- The scheduler maintains tiered queues and, at each block, executes due timers within `TIMER_PROCESSING_BUDGET_CYCLES`.
+- Within that budget, due timers are prioritized by an intra-block auction using GBA bids; execution ends when the queue empties or the budget is consumed.
+- Scheduling a timer (conceptual API) and cancellation are charged at fixed Cycle costs (see partial table above). Execution of the timer handler itself is subject to the standard cycles/cells limits of the invocation.
+
+## Failure modes and enforcement
+
+- Out of Cycles: the VM halts immediately; no further bytecodes execute.
+- Out of Cells: the VM halts immediately; no further I/O is performed.
+- Disallowed import: `ImportError` with penalty cycles charged.
+- Big integer overflow: `OverflowError` when results exceed the 4096-bit cap.
+- Determinism violations (e.g., attempting JIT or native FPU): forbidden by implementation and specification; clients must not diverge.
+
+## Developer guidance
+
+- Budgeting: estimate Cycles by dominant loops and host calls; estimate Cells by payload, storage writes, blob sizes, and return data.
+- Prefer streaming/chunked approaches for large data to stay within Cells limits.
+- Keep module usage inside the whitelist; avoid dynamic imports that may fail and waste cycles.
+- Validate numeric ranges and payload sizes early to avoid expensive partial work before hitting limits.
+- For timer-driven flows, assume best-effort delivery under a fixed per-block budget; timers may defer to subsequent blocks under congestion.
+
+## Further Reading
+
+- [Fees: Metering Points](/architecture/fees/metering-points)
+- [Dual EIP-1559](/architecture/fees/dual-eip1559)
+- [Actor VM Overview](/architecture/actor-vm/overview)
+- [Timers & Scheduler Overview](/architecture/scheduler/overview)

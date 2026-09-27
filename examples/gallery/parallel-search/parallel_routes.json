@@ -1,0 +1,25 @@
+{
+  "source": "https://docs.parallel.ai/public-openapi.json",
+  "endpoint": "https://api.parallel.ai/v1/search",
+  "method": "POST",
+  "auth": {"in": "header", "name": "x-api-key", "secret": "PARALLEL_API_KEY"},
+  "required_request": ["search_queries"],
+  "optional_request": ["objective", "mode", "max_chars_total", "session_id", "client_model", "advanced_settings"],
+  "wrapper_inputs": ["hire_id", "search_queries", "objective", "mode", "max_results", "max_chars_total", "max_chars_per_result", "session_id", "client_model"],
+  "wrapper_controlled": ["advanced_settings.max_results", "advanced_settings.excerpt_settings.max_chars_per_result"],
+  "excluded_request": ["caller-supplied advanced_settings"],
+  "required_response": ["search_id", "results", "session_id"],
+  "result_required": ["url", "excerpts"],
+  "modes": ["turbo", "fast", "basic", "advanced"],
+  "bounds": {
+    "max_queries": 5,
+    "max_query_chars": 200,
+    "max_objective_chars": 5000,
+    "max_session_chars": 1000,
+    "max_results": 5,
+    "max_chars_total": 8000,
+    "max_chars_per_result": 2000,
+    "runner_result_bytes": 65536,
+    "runner_data_target_bytes": 60000
+  }
+}

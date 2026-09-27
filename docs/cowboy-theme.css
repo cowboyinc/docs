@@ -1,0 +1,65 @@
+/*
+ * Cowboy / Gallop theme for Mintlify
+ * --------------------------------------------------------------------------
+ * Ports the gallop-foundations design tokens onto Mintlify's CSS variables so
+ * the docs match the Cowboy brand. The nugget accent and the Season faces are
+ * registered in docs.json (colors + fonts); this sheet handles the warm
+ * surface/neutral palette and the variable-font weight range, which docs.json
+ * cannot express.
+ *
+ * Token source of truth: gallop/packages/foundations/src/gallop.css
+ *   hay   — warm off-white surfaces      bison — warm near-black text
+ *   nugget — brand amber/orange (accent, set as docs.json colors.primary;
+ *            gallop's semantic layer reserves canyon red for errors)
+ *
+ * Mintlify color vars are space-separated RGB triples ("R G B"), consumed as
+ * rgb(var(--x) / <alpha>). Values below are the gallop hex tokens converted.
+ */
+
+/* Full variable-weight range for the Season faces. docs.json registers each
+   family at a single weight; declaring 100–900 here lets headings use the
+   font's real bold instead of a synthesized (faux) bold. */
+@font-face {
+  font-family: "Season Sans VF";
+  src: url("/fonts/SeasonSansVF.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Season Mix VF";
+  src: url("/fonts/SeasonMixVF.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Page surface → warm hay instead of stark white (gallop surface ≈ hay-100). */
+  --background-light: 249 247 245;
+
+  /* Neutral ramp → gallop hay (light end) ascending to bison (dark end).
+     Mintlify drives surfaces, borders, muted copy and body text from this one
+     scale; mapping it monotonically light→dark keeps contrast correct in both
+     light and dark mode. */
+  --gray-50:  253 252 251; /* hay-50   */
+  --gray-100: 244 240 235; /* hay-200  */
+  --gray-200: 241 235 229; /* hay-300  */
+  --gray-300: 230 222 214; /* hay-500  */
+  --gray-400: 174 163 153; /* bison-50 */
+  --gray-500: 138 127 118; /* bison-200 */
+  --gray-600: 97 87 79;    /* bison-400 */
+  --gray-700: 61 53 48;    /* bison-600 */
+  --gray-800: 46 40 36;    /* bison-700 */
+  --gray-900: 29 25 22;    /* bison-900 */
+  --gray-950: 15 14 12;    /* bison-950 */
+
+  /* Default divider/border → a visible-but-soft warm hay (gallop hay-500). */
+  --default-border-color: 230 222 214;
+}
+
+.dark,
+:root.dark {
+  /* Deepest dark surface → gallop bison-950. */
+  --background-dark: 15 14 12;
+}

@@ -1,0 +1,44 @@
+---
+title: "E1202 — Invalid input to host API call"
+description: "Invalid input to host API call"
+---
+
+# E1202 — Invalid input to host API call
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1202` |
+| **Slug** | `E1202` |
+| **Category** | `validation` (Validation) |
+
+
+## What happened
+
+Invalid input to host API call.
+
+## Why it happened
+
+An argument passed to a host API function has the wrong shape — most commonly an address that is not exactly 20 bytes.
+
+## How to fix
+
+Check argument shapes against the target actor's schema. Ensure addresses are 20-byte values.
+
+## Receipt example
+
+```json
+{
+  "code": 1202,
+  "slug": "E1202",
+  "category": "validation",
+  "what": "Invalid input to host API call",
+  "fix": "Check argument shapes against the target actor's schema.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1202"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

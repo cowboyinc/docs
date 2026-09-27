@@ -1,0 +1,44 @@
+---
+title: "E1609 — Threshold not met"
+description: "Threshold not met"
+---
+
+# E1609 — Threshold not met
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1609` |
+| **Slug** | `E1609` |
+| **Category** | `runner` (Runner / Consensus) |
+| **CIP** | CIP-2 |
+
+## What happened
+
+Threshold not met.
+
+## Why it happened
+
+Not enough runners submitted results before the job deadline.
+
+## How to fix
+
+Not enough runners submitted results before the deadline. Retry with a longer timeout.
+
+## Receipt example
+
+```json
+{
+  "code": 1609,
+  "slug": "E1609",
+  "category": "runner",
+  "what": "Threshold not met",
+  "fix": "Not enough runners submitted results before the deadline.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1609"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

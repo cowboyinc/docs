@@ -1,0 +1,39 @@
+---
+title: "Minimal Integration"
+description: "Minimal integration example for off-chain compute"
+---
+
+# Minimal Integration
+
+This page provides a minimal, conceptual sketch for integrating off-chain compute with an actor.
+
+> Note: Examples and names in this page are conceptual and illustrative (non-normative). Final interfaces and usage should follow the SDK and Developer Guide; normative behavior follows the Off-chain architecture documents.
+
+## Quick Path (Conceptual)
+
+1) Define task and mandatory result_schema
+- Include size and format constraints (e.g., max_return_bytes, data_format)
+- Provide task-specific parameters runners need
+
+2) Submit task with callback (CIP‑2)
+- Call `submit_task(task_definition, result_schema, callback, num_runners, timeout_blocks, proof_type_requested)`
+- Choose `num_runners (N)`, `timeout_blocks`, and a verification mode via `proof_type_requested`
+
+3) Handle deferred callback and finalize payment (CIP‑1 + CIP‑2)
+- In the callback, determine acceptance (e.g., quorum for N‑of‑M, or validate proofs/attestations)
+- Call `consume_result(task_id, consumed_runner_address)` to finalize payment and persist state
+
+## Common Pitfalls (and fixes)
+
+- Missing or too‑permissive result_schema → define `max_return_bytes` and strict format
+- Timeout too short for the workload → increase `timeout_blocks` based on expected execution
+- Callback does not call `consume_result` → ensure finalize step is invoked to pay winners
+- Large or nested return payloads → return compact summaries; fetch details on demand
+
+## Further Reading
+
+- [Off-Chain Overview](/architecture/offchain/overview)
+- [Off-Chain Task Lifecycle](/architecture/offchain/lifecycle)
+- [Callback, Timeout & Challenge](/architecture/offchain/callback-timeout-challenge)
+
+

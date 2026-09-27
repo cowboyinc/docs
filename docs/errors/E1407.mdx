@@ -1,0 +1,44 @@
+---
+title: "E1407 — Mint would exceed max_supply"
+description: "Mint would exceed max_supply"
+---
+
+# E1407 — Mint would exceed max_supply
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1407` |
+| **Slug** | `E1407` |
+| **Category** | `token` (Token (CIP-20)) |
+| **CIP** | CIP-20 |
+
+## What happened
+
+Mint would exceed max_supply.
+
+## Why it happened
+
+The requested mint amount, when added to the current total supply, exceeds the token's configured `max_supply`.
+
+## How to fix
+
+Lower the mint amount to stay within `max_supply`.
+
+## Receipt example
+
+```json
+{
+  "code": 1407,
+  "slug": "E1407",
+  "category": "token",
+  "what": "Mint would exceed max_supply",
+  "fix": "Lower the mint amount to stay within `max_supply`.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1407"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

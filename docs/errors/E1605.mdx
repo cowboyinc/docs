@@ -1,0 +1,44 @@
+---
+title: "E1605 — Job not found"
+description: "Job not found"
+---
+
+# E1605 — Job not found
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1605` |
+| **Slug** | `E1605` |
+| **Category** | `runner` (Runner / Consensus) |
+| **CIP** | CIP-2 |
+
+## What happened
+
+Job not found.
+
+## Why it happened
+
+The referenced job does not exist — it may have been completed or cancelled.
+
+## How to fix
+
+The job may have been completed or cancelled. Query the job status.
+
+## Receipt example
+
+```json
+{
+  "code": 1605,
+  "slug": "E1605",
+  "category": "runner",
+  "what": "Job not found",
+  "fix": "The job may have been completed or cancelled.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1605"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

@@ -1,0 +1,39 @@
+{
+  "source": "https://docs.anchorbrowser.io/api-reference/billing/get-billing-info.md",
+  "web_unlocker_source": "https://docs.anchorbrowser.io/api-reference/tools/web-unlocker.md",
+  "endpoint": "https://api.anchorbrowser.io/v1/billing",
+  "method": "GET",
+  "auth": {"in": "header", "name": "anchor-api-key", "secret": "ANCHOR_API_KEY", "scheme": "api-key"},
+  "required_request": [],
+  "optional_request": ["granularity"],
+  "wrapper_inputs": ["hire_id", "granularity"],
+  "granularities": ["day", "week", "month"],
+  "required_response": ["data"],
+  "response_summary_fields": ["credits", "credits_used"],
+  "excluded_endpoints": [
+    "POST /v1/tools/fetch/webpage",
+    "POST /v1/screenshot",
+    "GET /v1/sessions/{id}/pdf",
+    "GET /v1/sessions/{id}/recordings/primary",
+    "POST /v1/sessions",
+    "POST /v1/sessions/async",
+    "GET /v1/sessions/{id}",
+    "POST /v1/perform-web-task",
+    "POST /v2/tasks/{id}/run",
+    "* /v1/profiles",
+    "* /v1/identities",
+    "* /v1/applications",
+    "* /v1/webhooks",
+    "* /v1/extensions",
+    "* /v1/certificates",
+    "* /v1/integrations",
+    "GET /v1/events/{name}",
+    "GET /v1/billing (hour granularity, custom window)"
+  ],
+  "bounds": {
+    "max_request_bytes": 16384,
+    "runner_result_bytes": 65536,
+    "runner_data_target_bytes": 60000,
+    "result_bytes": 38000
+  }
+}

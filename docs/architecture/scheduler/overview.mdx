@@ -1,0 +1,399 @@
+---
+title: Timers & Scheduler Overview
+description: Understanding Cowboy's protocol-level timer system
+---
+
+## Introduction
+
+Cowboy's **Actor Message Scheduler** is a protocol-level mechanism that enables truly autonomous actors through native timer support. Unlike traditional blockchains that require external infrastructure for scheduled execution, Cowboy embeds timers directly into the consensus layer.
+
+<Info>
+  **Key Innovation**: Actors can schedule their own future execution without relying on centralized keepers, cron jobs, or external bots.
+</Info>
+
+<Note>
+  Examples in this page are conceptual and illustrative (non-normative). Final interfaces are defined by the SDK and normative CIPs; do not treat these snippets as fixed APIs.
+</Note>
+
+## The Problem with Traditional Chains
+
+### No Native Time Awareness
+
+On many traditional chains, contracts cannot self-schedule execution; external actors must trigger functions, which introduces centralization and reliability risks.
+
+```solidity
+// ❌ Ethereum: This never executes itself
+contract Liquidator {
+    function checkPosition() public {
+        if (position.isUndercollateralized()) {
+            liquidate();
+        }
+        // Who calls this? When? 🤷
+    }
+}
+```
+
+**Current workarounds** all have significant drawbacks:
+
+<Tabs>
+  <Tab title="Cron Jobs">
+    **Approach**: Off-chain server runs scheduled tasks
+    
+    **Problems**:
+    - ❌ Centralized (single point of failure)
+    - ❌ Requires infrastructure maintenance
+    - ❌ Trust assumption (will it run?)
+    - ❌ No SLA guarantees
+  </Tab>
+  
+  <Tab title="Keeper Networks">
+    **Approach**: Decentralized network of bots (e.g., Chainlink Keepers)
+    
+    **Problems**:
+    - ❌ Complex integration
+    - ❌ Expensive (additional fees)
+    - ❌ External dependency
+    - ❌ Still requires registration/management
+  </Tab>
+  
+  <Tab title="User-Triggered">
+    **Approach**: Users call functions when needed
+    
+    **Problems**:
+    - ❌ Poor UX (users must remember)
+    - ❌ Unreliable (what if they forget?)
+    - ❌ No economic incentive
+    - ❌ Not suitable for time-sensitive tasks
+  </Tab>
+</Tabs>
+
+## Cowboy's Solution: Native Protocol Timers
+
+### How It Works
+
+Actors can schedule future execution by specifying a target height and a Gas Bidding Agent (GBA). The protocol will trigger the handler when due, under a fixed per‑block timer budget (CIP‑1). The GBA dynamically prices execution based on protocol‑supplied context.
+
+### Core Components
+
+<CardGroup cols={2}>
+  <Card title="Hierarchical Calendar Queue" icon="calendar">
+    Three-tier queue system for O(1) scheduling performance
+  </Card>
+  <Card title="Gas Bidding Agents" icon="gavel">
+    Dynamic pricing for timer execution based on urgency
+  </Card>
+  <Card title="Per-Block Budget" icon="gauge">
+    Fixed resource allocation prevents DoS attacks
+  </Card>
+  <Card title="Priority Queue" icon="ranking-star">
+    Highest-bidding timers execute first during congestion
+  </Card>
+</CardGroup>
+
+## Hierarchical Calendar Queue
+
+### Three-Tier Architecture
+
+Timers are organized into three layers based on their execution distance:
+
+```
++--------------------------------------------------------------------+
+|  Layer 1: Block Ring Buffer                                        |
+|  For: Near-term buckets                                            |
+|  Performance: O(1) enqueue/dequeue                                 |
++-------------------------------+------------------------------------+
+                                | Promote as epoch approaches
+                                v
++--------------------------------------------------------------------+
+|  Layer 2: Epoch Queue                                              |
+|  For: Mid-term horizons                                            |
+|  Performance: Amortized maintenance                                |
++-------------------------------+------------------------------------+
+                                | Promote as timers enter range
+                                v
++--------------------------------------------------------------------+
+|  Layer 3: Overflow Sorted Set                                      |
+|  For: Long-term timers                                             |
+|  Performance: O(log N) ops                                         |
++--------------------------------------------------------------------+
+```
+
+#### Layer 1: Block Ring Buffer
+
+**Purpose**: Handle timers scheduled for the immediate future.
+
+**Structure**:
+```python
+Layer 1 (ring buffer) maps imminent blocks to buckets; placing and retrieving timers is O(1). Exact sizes are governance‑defined per CIP‑1.
+```
+
+**Operations**:
+```python
+Enqueue/dequeue at Layer 1 are O(1); due timers for the current height are retrieved from the corresponding bucket.
+```
+
+**Example**:
+```python
+Current block: 1000
+Timer scheduled for block 1050
+
+Bucket: 1050 % 256 = 26
+Action: Add to ring_buffer[26]
+
+At block 1050:
+Action: Retrieve all timers from ring_buffer[26]
+```
+
+#### Layer 2: Epoch Queue
+
+**Purpose**: Hold timers scheduled for the next few hours/days.
+
+**Structure**:
+```python
+Layer 2 (epoch queue) groups timers by future epochs; sizes and epochs are governance‑defined. At epoch boundaries, timers entering range are promoted into Layer 1.
+```
+
+**Epoch Maintenance**:
+```python
+Epoch maintenance promotes timers from the current epoch bucket into ring buckets; all work is amortized and bounded (CIP‑1).
+```
+
+**Example**:
+```python
+Current block: 1000 (epoch 2)
+Timer scheduled for block 1500 (epoch 4)
+
+Action: Add to epoch_queue[4]
+
+At block 1440 (start of epoch 4):
+Action: Move all timers from epoch_queue[4] to ring_buffer
+```
+
+#### Layer 3: Overflow Sorted Set
+
+**Purpose**: Store very long-term timers.
+
+**Structure**:
+```python
+Layer 3 (overflow sorted set) holds very long‑horizon timers in a Merkleized balanced tree, providing O(log N) operations and efficient range queries.
+```
+
+**Maintenance**:
+```python
+Overflow migration moves timers that enter the migration horizon into their epoch buckets during epoch maintenance.
+```
+
+**Example**:
+```python
+Current block: 1000
+Timer scheduled for block 50,000
+
+Action: Insert into overflow_set
+
+Later, when block 45,000 arrives:
+Action: Migrate from overflow_set to epoch_queue
+```
+
+### Performance Characteristics
+
+| Operation | Layer 1 | Layer 2 | Layer 3 |
+|-----------|---------|---------|---------|
+| Enqueue | O(1) | O(1) | O(log N) |
+| Dequeue | O(1) | Amortized O(1) | O(log N) |
+| Memory | Fixed | O(epochs) | O(distant timers) |
+| Range | Near-term | Mid-term | Long-term |
+
+**Result**: Efficiently handles millions of timers with O(1) performance for the common case.
+
+## Dynamic Gas Bidding
+
+### The Challenge
+
+Fixed pre‑payment for future execution is inflexible under dynamic network conditions; actors need dynamic bidding at execution time.
+
+### The Solution: Gas Bidding Agents (GBA)
+
+**Concept**: Actors specify a smart contract (GBA) that dynamically determines the execution bid at runtime.
+
+```python
+Gas Bidding Agents (GBA) are read‑only contracts queried at execution time; they return bidding parameters (e.g., max_fee_per_cycle, tip_per_cycle) using protocol‑supplied context (trigger/current heights, basefees, last block usage, owner balance) per CIP‑1.
+```
+
+### GBA Context
+
+The protocol provides rich context to GBAs for informed bidding:
+
+```python
+class BiddingContext:
+    # Timing information
+    trigger_block_height: int      # When timer was scheduled
+    current_block_height: int      # Current height
+    
+    # Fee market information
+    basefee_cycle: int             # Current cycle basefee
+    basefee_cell: int              # Current cell basefee
+    last_block_cycle_usage: int    # Congestion indicator
+    
+    # Actor information
+    owner_actor_balance: int       # Available funds for payment
+```
+
+**Example Use Cases**:
+
+<Tabs>
+  <Tab title="DeFi Liquidation">
+    ```python
+    def get_gas_bid(self, context):
+        # Check collateral ratio
+        position = load_position(self.position_id)
+        risk = calculate_liquidation_risk(position)
+        
+        # Bid based on risk
+        if risk > 0.9:  # Very high risk
+            return ultra_aggressive_bid()
+        elif risk > 0.7:
+            return aggressive_bid()
+        else:
+            return normal_bid()
+    ```
+  </Tab>
+  
+  <Tab title="Oracle Update">
+    ```python
+    def get_gas_bid(self, context):
+        # Check how stale current price is
+        last_update = self.last_price_update_block
+        staleness = context.current_block_height - last_update
+        
+        # Bid based on staleness
+        if staleness > 100:  # Very stale
+            return high_priority_bid()
+        else:
+            return normal_bid()
+    ```
+  </Tab>
+  
+  <Tab title="Gaming Tick">
+    ```python
+    def get_gas_bid(self, context):
+        # Game tick should execute reliably but not aggressively
+        # Consistent, moderate bidding
+        return moderate_bid()
+    ```
+  </Tab>
+</Tabs>
+
+## DoS Protection & Congestion Handling
+
+### Fixed Per-Block Budget
+
+**Mechanism**: Hard limit on timer resource consumption per block.
+
+```python
+At each block: collect due timers, query GBA for bids, order by effective tip, execute until the per‑block timer budget is exhausted, roll over the rest (CIP‑1).
+```
+
+**Benefits**:
+- ✅ Regular user transactions always have guaranteed space
+- ✅ Timers cannot monopolize block resources
+- ✅ Predictable block processing time
+- ✅ DoS-resistant
+
+### Priority Queue Execution
+
+**Algorithm**:
+
+```python
+Execution order is by effective tip (min(tip_per_cycle, max_fee_per_cycle − basefee_cycle)); deterministic ordering and rollover rules ensure bounded work and liveness (CIP‑1/CIP‑3).
+```
+
+**Example Scenario**:
+
+```
+Block 1000 timer queue (10 timers, budget for 6):
+
+Priority Queue (sorted by tip):
+1. Liquidation Bot A: tip=1000 → Execute ✅
+2. Liquidation Bot B: tip=800  → Execute ✅
+3. Oracle Update: tip=700      → Execute ✅
+4. DeFi Rebalance: tip=500     → Execute ✅
+5. NFT Auction End: tip=400    → Execute ✅
+6. Game Tick: tip=300          → Execute ✅
+--- Budget exhausted (10M cycles) ---
+7. Low Priority Bot: tip=200   → Rollover to block 1001
+8. Reminder Service: tip=100   → Rollover to block 1001
+9. Data Archive: tip=50        → Rollover to block 1001
+10. Test Timer: tip=10         → Rollover to block 1001
+```
+
+### Best-Effort Delivery
+
+**Rollover Mechanism**:
+
+```python
+def rollover_to_next_block(timer):
+    """
+    Unexecuted timers automatically move to next block.
+    """
+    # Increment delay counter
+    timer.delay_count += 1
+    
+    # Add to next block's queue
+    next_block = current_block + 1
+    bucket = next_block % RING_BUFFER_SIZE
+    ring_buffer[bucket].append(timer)
+    
+    # Optional: Penalties for excessive delays
+    if timer.delay_count > MAX_ALLOWED_DELAYS:
+        # Force execute or cancel with penalty
+        handle_excessive_delay(timer)
+```
+
+**Properties**:
+- ✅ **Liveness**: Timers eventually execute (assuming sufficient balance)
+- ✅ **No data loss**: Automatic rollover
+- ✅ **Fair competition**: Higher bids still prioritized on retry
+- ✅ **Economic feedback**: Repeated delays signal need for higher bids
+
+## Use Cases
+
+### DeFi Liquidation Bot
+
+```python
+DeFi liquidation bots can use timers to regularly check positions and act promptly; GBA logic can bid more under volatility.
+```
+
+### Oracle Price Updates
+
+```python
+Oracles can schedule periodic updates and combine with off‑chain tasks for data fetching.
+```
+
+### Game Loop
+
+```python
+Games can use timers for deterministic ticks within blockchain cadence.
+```
+
+### Subscription Service
+
+```python
+Subscription services can schedule periodic renewal checks, relying on the scheduler’s budget and bidding for priority when needed.
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Sequence Diagram" icon="diagram-project" href="/architecture/scheduler/sequence-diagram">
+    Visualize the complete timer lifecycle
+  </Card>
+  <Card title="DoS Parameters" icon="shield" href="/architecture/scheduler/dos-parameters">
+    Detailed specification of protection mechanisms
+  </Card>
+</CardGroup>
+
+## Further Reading
+
+- [CIP-1: Actor Message Scheduler](/cips/cip-1-actor-scheduler)
+- [Actor VM Overview](/architecture/actor-vm/overview)
+- [Fee Model](/architecture/fees/overview)

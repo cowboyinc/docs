@@ -1,0 +1,44 @@
+---
+title: "E1221 — Actor already exists at target address"
+description: "Actor already exists at target address"
+---
+
+# E1221 — Actor already exists at target address
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1221` |
+| **Slug** | `E1221` |
+| **Category** | `runtime` (Runtime) |
+
+
+## What happened
+
+Actor already exists at target address.
+
+## Why it happened
+
+A deploy transaction tried to create an actor at an address that already has one.
+
+## How to fix
+
+Use a different salt to produce a different address, or upgrade the existing actor instead.
+
+## Receipt example
+
+```json
+{
+  "code": 1221,
+  "slug": "E1221",
+  "category": "runtime",
+  "what": "Actor already exists at target address",
+  "fix": "Use a different salt to produce a different address, or upgrade the existing actor instead.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1221"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

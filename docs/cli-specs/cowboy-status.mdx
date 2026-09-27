@@ -1,0 +1,38 @@
+---
+title: "cowboy status"
+description: Show Cowboy network status (height, mempool, sync, basefee)
+icon: activity
+---
+
+## Synopsis
+
+```bash
+cowboy status [--rpc-url <url>]
+```
+
+## Behavior
+
+1. Query the RPC endpoint for chain health and mempool state.
+2. Print current chain height, mempool size, sync state, and the current cycle / cell basefee.
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--rpc-url` | Auto-discovered | RPC endpoint ([key auto-discovery](/cli-specs/key-auto-discovery)) |
+
+## Example
+
+```bash
+$ cowboy status
+Network: dev (https://rpc.mesa.cowboylabs.net)
+  Chain height: 12_493
+  Mempool: 3 pending
+  Sync: in sync
+  Basefee: 1 wei/cycle, 1 wei/cell
+```
+
+## Edge Cases
+
+- Read-only command. Does not require a private key.
+- If the RPC endpoint is unreachable, prints a clear connection error.

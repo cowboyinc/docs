@@ -1,0 +1,9 @@
+.next/
+node_modules/
+.env.local
+*.tsbuildinfo
+.npmrc
+dist/
+__pycache__/
+tests/__pycache__/
+tools/__pycache__/

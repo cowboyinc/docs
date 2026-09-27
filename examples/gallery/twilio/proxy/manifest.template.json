@@ -1,0 +1,29 @@
+{
+  "entitlements": [
+    {
+      "id": "http.fetch",
+      "params": {
+        "allowlist_domains": ["TWILIO_API_DOMAIN"],
+        "max_requests": 8
+      }
+    },
+    {
+      "id": "secrets.read",
+      "params": {
+        "keys": ["HIRER_EOA:TWILIO_API_BASIC"]
+      }
+    },
+    {
+      "id": "secrets.verify",
+      "params": {
+        "keys": ["HIRER_EOA:TWILIO_AUTH_TOKEN"]
+      }
+    },
+    {
+      "id": "storage.kv"
+    },
+    {
+      "id": "timer.schedule"
+    }
+  ]
+}

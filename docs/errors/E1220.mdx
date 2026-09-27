@@ -1,0 +1,44 @@
+---
+title: "E1220 — Target actor does not exist"
+description: "Target actor does not exist"
+---
+
+# E1220 — Target actor does not exist
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1220` |
+| **Slug** | `E1220` |
+| **Category** | `runtime` (Runtime) |
+
+
+## What happened
+
+Target actor does not exist.
+
+## Why it happened
+
+The target address in a `call_actor` or `send_message` does not have a deployed actor.
+
+## How to fix
+
+Deploy the target actor or correct the target address.
+
+## Receipt example
+
+```json
+{
+  "code": 1220,
+  "slug": "E1220",
+  "category": "runtime",
+  "what": "Target actor does not exist",
+  "fix": "Deploy the target actor or correct the target address.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1220"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

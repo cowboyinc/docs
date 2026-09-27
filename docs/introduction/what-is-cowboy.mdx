@@ -1,0 +1,268 @@
+---
+title: What is Cowboy?
+description: Understanding the fundamentals of the Cowboy Protocol
+icon: bars-staggered
+---
+
+## Overview
+
+Cowboy is a **Layer 1 blockchain** purpose-built for **autonomous agents** and **verifiable off-chain computation**. Unlike traditional smart contract platforms, Cowboy treats **time**, **compute vs. storage pricing**, **off-chain work**, and **large data** as first-class protocol primitives.
+
+<Note>
+  **Key Insight**: Cowboy treats *time* as a first-class citizen. Actors can schedule their own future execution without depending on external keepers, bots, or relayers.
+</Note>
+
+## The Problem Space
+
+Modern blockchain platforms face a few fundamental challenges for agentic workloads:
+
+### 1. No Native Time Awareness
+
+Smart contracts cannot schedule their own future execution. Developers fall back on:
+- **External bots** (centralized, unreliable)
+- **Keeper networks** (expensive, extra trust)
+- **User-triggered transactions** (poor UX)
+
+### 2. Unfair Resource Pricing
+
+A single gas metric can't distinguish between:
+- **Computation** (CPU cycles)
+- **Storage** (state growth, persisted forever)
+- **Data transfer** (bandwidth)
+
+This subsidizes one use case at the expense of another and makes fees hard to predict.
+
+### 3. Limited On-Chain Computation
+
+On-chain VMs are intentionally constrained — no AI/ML inference, no large data processing, no external API calls, no off-chain data access. **Moving compute off-chain then introduces trust issues.**
+
+### 4. No Native Large-Data Storage
+
+Storing anything bigger than a few KB on-chain is prohibitively expensive. Developers resort to IPFS, Arweave, or centralized S3, each with its own trust model.
+
+## Cowboy's Solution
+
+### 1. Protocol-Level Timers (CIP-1)
+
+Native timers as a core primitive:
+
+- **Tiered Calendar Queue**: O(1) enqueue/dequeue for near-term timers
+- **Dynamic Gas Bidding (GBA)**: Actors bid for priority using protocol-supplied context
+- **Autonomous Execution**: No external keeper infrastructure required
+
+### 2. Dual-Metered Gas Model (CIP-3)
+
+Compute and data are metered independently with separate fee markets:
+
+<CardGroup cols={2}>
+  <Card title="Cycles (Computation)" icon="microchip">
+    **What it measures**: VM work — bytecode instructions, function calls, operations
+
+    **Use case**: Python code execution, cryptography, data processing
+
+    **Metering**: Fuel-based tracking inside the Rust-backed PVM
+  </Card>
+
+  <Card title="Cells (Data/Storage)" icon="database">
+    **What it measures**: Bytes — transaction payloads, storage writes, return data
+
+    **Use case**: State storage, large inputs/outputs, blob commitments
+
+    **Metering**: Event-based accounting at I/O boundaries
+  </Card>
+</CardGroup>
+
+**Benefits:**
+- Fair pricing: pay for what you actually use
+- Predictable costs: each resource has its own basefee
+- DoS protection: separate limits per dimension
+
+### 3. Verifiable Off-Chain Compute (CIP-2)
+
+Actors **outsource work** to a decentralized runner network while keeping results verifiable on-chain.
+
+**Runner executor types:**
+- **LLM** — OpenAI, Anthropic, OpenRouter, and compatible APIs
+- **HTTP** — Arbitrary authenticated HTTP requests
+- **MCP** — Model Context Protocol tool calls
+
+**Key properties:**
+- **VRF-based selection**: Deterministic, verifiable runner assignment
+- **Asynchronous execution**: Deferred callback via continuation FSM (CIP-6)
+- **Configurable verification**: N-of-M consensus, TEE attestation, or ZK proofs
+- **Market-driven pricing**: Runners compete on price and reliability
+
+### 4. Encrypted Distributed Storage (CBFS)
+
+Large data (models, datasets, media, logs) lives off-chain in CBFS:
+
+- **Client-side AES-256-GCM encryption** — storage nodes never see plaintext
+- **Reed-Solomon erasure coding** — `K` data + `M` parity shards, recover from any `K`
+- **QUIC transport** — low-latency shard reads/writes
+- **FUSE mount** — actors and runners attach volumes as normal filesystems via delegated capability tokens
+
+Metadata authority lives on-chain (volume registry, capability tokens); shard data lives on relay nodes.
+
+### 5. Ethereum-Compatible Keys
+
+Cowboy uses the same **secp256k1** keypairs and 20-byte address scheme as Ethereum. An existing Ethereum key works unchanged — same address, same signing flow. This makes wallet integration, tooling reuse, and cross-chain bridging dramatically simpler.
+
+## Core Architecture
+
+### Actor Model
+
+Cowboy uses an **actor-based** execution model:
+
+```
++----------------------+
+|   Transactions       |
++----------------------+
+          |
+          v
++------------------------------------------------------------+
+|    Actor                                                   |
+|  - Persistent State (KV store, priced in Cells)            |
+|  - Handler Methods (Python)                                |
+|  - Mailbox (incoming async messages)                       |
+|  - Timer Queue (scheduled execution, CIP-1)                |
+|  - Balance (CBY, the native token)                         |
+|  - Continuation state (suspended off-chain jobs)           |
++------------------------------------------------------------+
+          |
+          v
++----------------------+
+|   Responses / events |
++----------------------+
+```
+
+**Characteristics:**
+- **Isolated state**: each actor has its own KV storage
+- **Message-driven**: asynchronous, deterministic ordering
+- **Single-threaded**: one handler invocation at a time
+- **Autonomous**: schedules its own future execution via timers and deferred jobs
+
+### Python VM
+
+Actors are Python programs executed in the **PVM** — a Rust-based deterministic Python 3 interpreter (forked from RustPython). Two ways to write an actor:
+
+**Low-level (host API):** import `pvm_host` directly.
+
+```python
+import pvm_host
+
+def increment(payload):
+    val = pvm_host.get_state(b"counter") or b"\x00" * 8
+    n = int.from_bytes(val, "big") + 1
+    pvm_host.set_state(b"counter", n.to_bytes(8, "big"))
+    return n
+```
+
+**Recommended — CIP-6 SDK:** use `cowboy_sdk` decorators for actor wiring, permissions, storage, runtime helpers, and continuation-based FSMs.
+
+```python
+from cowboy_sdk import actor, public, codec
+
+@actor
+class Counter:
+    @public(decode="raw")
+    def init(self, payload=None):
+        self.storage["count"] = 0
+
+    @public(decode="raw")
+    def increment(self, payload=None):
+        count = (self.storage.get("count") or 0) + 1
+        self.storage["count"] = count
+        return codec.encode(count)
+
+
+def init(payload):
+    return Counter().init(payload)
+
+
+def increment(payload):
+    return Counter().increment(payload)
+```
+
+**VM guarantees:**
+- ✅ **Determinism**: same input → same output, bit-identical across all nodes
+- ✅ **Sandboxing**: no file I/O, no network, no system calls
+- ✅ **Fuel metering**: every bytecode operation has a cost
+- ✅ **Checkpointable**: full program state can be serialized and resumed (the mechanism behind async runner jobs)
+
+### Fee Markets
+
+Two **independent EIP-1559-style markets**:
+
+```
+Cycles Market:
+  basefee_cycle adjusts based on compute usage per block
+
+Cells Market:
+  basefee_cell adjusts based on data/storage usage per block
+
+Total Fee = (cycles_used × basefee_cycle) + (cells_used × basefee_cell) + tips
+```
+
+**Basefee is burned**, creating deflationary pressure on CBY.
+
+## What Makes Cowboy Different
+
+| Feature | Traditional Chains | Cowboy |
+|---------|-------------------|--------|
+| **Timers** | External keepers | Native protocol (CIP-1) |
+| **Language** | Domain-specific (Solidity, Move) | Python |
+| **Gas Model** | Single metric | Dual-metered (Cycles + Cells) |
+| **Off-chain Compute** | Trusted oracles | Verifiable runner network (LLM/HTTP/MCP) |
+| **Large-data Storage** | IPFS / Arweave / S3 | Native encrypted CBFS |
+| **Keys** | Chain-specific | Ethereum-compatible secp256k1 |
+| **Autonomy** | Reactive only | Fully autonomous |
+| **Consensus** | Varies | Simplex BFT (~1s blocks, ~2s finality) |
+
+## Design Principles
+
+<AccordionGroup>
+  <Accordion title="1. Determinism First" icon="fingerprint">
+    Every operation must produce identical results on every node. Software float, no JIT, curated stdlib, no system calls.
+  </Accordion>
+
+  <Accordion title="2. Fair Resource Pricing" icon="scale-balanced">
+    Compute, storage, and data are priced independently based on actual costs.
+  </Accordion>
+
+  <Accordion title="3. Autonomous by Default" icon="robot">
+    Actors schedule their own execution. No external keepers required.
+  </Accordion>
+
+  <Accordion title="4. Verifiable Off-Chain" icon="shield-check">
+    Heavy or non-deterministic work (LLM inference, HTTP, MCP) runs off-chain but returns verifiable results.
+  </Accordion>
+
+  <Accordion title="5. Developer-Friendly" icon="code">
+    Python, a familiar SDK, Ethereum-compatible keys. Don't force people to learn niche languages or re-issue keys.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/overview/architecture">
+    End-to-end system design
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/getting-started/quickstart">
+    Build and run your first actor
+  </Card>
+  <Card title="Minimal Actor" icon="code" href="/architecture/actor-vm/minimal-actor">
+    Anatomy of a Cowboy actor
+  </Card>
+  <Card title="Examples Curriculum" icon="laptop-code" href="/developers/examples">
+    Learn builder patterns in order
+  </Card>
+</CardGroup>
+
+## Further Reading
+
+- [Architecture Overview](/overview/architecture)
+- [Design Principles](/overview/design-principles)
+- [Actor VM Overview](/architecture/actor-vm/overview)
+- [Fee Model Overview](/architecture/fees/overview)
+- [Key Format](/architecture/keys/key-format)

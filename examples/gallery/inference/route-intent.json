@@ -1,0 +1,40 @@
+{
+  "format": "inference-route-intent-v1",
+  "status": "Design input only. This is not a native declaration or installable Routes blob.",
+  "target_kind": "runner_route",
+  "funding": "actor",
+  "required_deployment_inputs": [
+    "bundle_hash",
+    "runtime_hash",
+    "per_route_limits",
+    "session_limits",
+    "per_route_sponsorship",
+    "actor_sponsorship",
+    "mounts",
+    "purpose_scoped_secret_refs",
+    "ingress_verify_key",
+    "metering_key",
+    "price_advert_digest"
+  ],
+  "routes": [
+    {"verb": "GET", "path": "/manage", "auth": "public", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": []},
+    {"verb": "GET", "path": "/manage/", "auth": "public", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": []},
+    {"verb": "GET", "path": "/manage/assets/manage.css", "auth": "public", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": []},
+    {"verb": "GET", "path": "/manage/assets/manage.js", "auth": "public", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": []},
+    {"verb": "GET", "path": "/manage/assets/vendor/crypto.js", "auth": "public", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": []},
+    {"verb": "GET", "path": "/manage/assets/vendor/utils.js", "auth": "public", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": []},
+    {"verb": "GET", "path": "/manage/assets/vendor/_u64.js", "auth": "public", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": []},
+    {"verb": "GET", "path": "/manage/assets/vendor/sha3.js", "auth": "public", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": []},
+    {"verb": "GET", "path": "/manage/assets/wallet.js", "auth": "public", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": []},
+    {"verb": "GET", "path": "/manage/config", "auth": "public", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": []},
+    {"verb": "GET", "path": "/manage/api/catalog", "auth": "account", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": ["hire_volume_read", "management_nonce_volume_write"]},
+    {"verb": "GET", "path": "/manage/api/keys", "auth": "account", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": ["hire_volume_read", "management_nonce_volume_write"]},
+    {"verb": "POST", "path": "/manage/api/keys", "auth": "account", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": ["hire_volume_write", "ingress_issuer_sign", "management_nonce_volume_write"]},
+    {"verb": "DELETE", "path": "/manage/api/keys/:id", "auth": "account", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": ["hire_volume_write", "management_nonce_volume_write"]},
+    {"verb": "GET", "path": "/manage/api/usage", "auth": "account", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": ["hire_volume_read", "management_nonce_volume_write"]},
+    {"verb": "PUT", "path": "/manage/api/read-grant", "auth": "account", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": ["volume_owner_sign", "volume_dek_read", "management_nonce_volume_write"]},
+    {"verb": "DELETE", "path": "/manage/api/read-grant", "auth": "account", "kinds": ["per_call"], "hire": null, "implementation": "offchain.manage.Management.handle", "secrets": ["volume_owner_sign", "management_nonce_volume_write"]},
+    {"verb": "GET", "path": "/v1/models", "auth": "public", "kinds": ["per_call"], "hire": "bound", "implementation": "offchain.inference.Service.models", "bearer": "cwir1 ingress permit plus handler key record verification", "secrets": ["hire_volume_read"]},
+    {"verb": "POST", "path": "/v1/chat/completions", "auth": "public", "kinds": ["session_open", "session_close"], "hire": "bound", "implementation": "offchain.inference.Service", "bearer": "cwir1 ingress permit plus handler key record verification", "secrets": ["hire_volume_write", "metering_sign"]}
+  ]
+}

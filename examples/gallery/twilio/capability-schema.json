@@ -1,0 +1,58 @@
+{
+  "cip33_schema": 1,
+  "name": "twilio",
+  "summary": "Multi-tenant two-way SMS assistant. Hire it, connect your own Twilio number, and it answers text messages with conversation memory — your Twilio credentials stay under your account, released only to your own credential-proxy actor.",
+  "badges": { "human_hireable": true, "agent_hireable": false },
+  "methods": [
+    {
+      "name": "connect_number",
+      "caller": "hirer (signed tx)",
+      "params": {
+        "type": "object",
+        "required": ["twilio_number", "hire_id", "proxy", "state_volume"],
+        "properties": {
+          "twilio_number": { "type": "string", "description": "the hirer's Twilio phone number in E.164 (+1…) — inbound SMS to it route to this hire" },
+          "hire_id": { "type": "integer", "description": "Trading Post hire id" },
+          "proxy": { "type": "string", "description": "hirer's deployed twiliorelay proxy actor address (0x…)" },
+          "state_volume": { "type": "string", "description": "per-hire CBFS state volume name (provisioned by the creator at connect time)" }
+        }
+      },
+      "result": { "type": "string", "const": "ok: number connected" }
+    },
+    {
+      "name": "disconnect_number",
+      "caller": "hirer (signed tx)",
+      "params": {
+        "type": "object",
+        "required": ["twilio_number"],
+        "properties": { "twilio_number": { "type": "string" } }
+      },
+      "result": { "type": "string" }
+    }
+  ],
+  "webhooks": [
+    {
+      "path": "/twilio/sms",
+      "verb": "POST",
+      "description": "Twilio Messaging webhook (all tenants share it; routing is by the destination number To). Set it as the 'A message comes in' webhook on your Twilio number.",
+      "authentication": "Twilio X-Twilio-Signature (HMAC-SHA1 over URL+sorted params), verified runner-side against YOUR Auth Token via your credential proxy (CIP-24 §5.5); the listed actor never holds it."
+    }
+  ],
+  "hirer_setup": {
+    "description": "Post-hire onboarding (scripted by connect-workspace.sh): provision a Twilio number and a scoped Standard API Key, store TWILIO_AUTH_TOKEN + TWILIO_API_BASIC (base64 of 'SKsid:secret') as CBSS secrets under your account, deploy your twiliorelay proxy (manifest names exactly those two keys), ACL both secrets to the proxy, then call connect_number.",
+    "secrets_held_by_listed_actor": []
+  },
+  "pricing_terms": [{ "type": "Free" }],
+  "runner_requirements": {
+    "verbs": ["agent", "http"],
+    "models": ["local"],
+    "mounts": [
+      { "volume": "artifact (pinned)", "mode": "ro", "release": "CIP-33 key lease (hire-bound jobs only)" },
+      { "volume": "per-hire state", "mode": "rw", "release": "CIP-9 account path" }
+    ]
+  },
+  "rate_limits": {
+    "per_conversation": "single in-flight request",
+    "global_dispatch_cap": 100000
+  }
+}

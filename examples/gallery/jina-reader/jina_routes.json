@@ -1,0 +1,124 @@
+{
+  "source": "https://api.jina.ai/openapi.json",
+  "retrieved": "2026-09-10",
+  "sha256": "d16aa597a85dd06b36102363e96b1163be7ed26b8cb52058b938af6906ff49c5",
+  "schema_version": "2026.09.09.1755",
+  "operations": [
+    "DELETE /v1/batch/{batch_id}",
+    "DELETE /v1/classifiers/{classifier_id}",
+    "GET /health",
+    "GET /live",
+    "GET /ready",
+    "GET /v1/batch/{batch_id}",
+    "GET /v1/batch/{batch_id}/errors",
+    "GET /v1/batch/{batch_id}/output",
+    "GET /v1/batches",
+    "GET /v1/classifiers",
+    "GET /v1/models",
+    "GET /v1/models/{model_id}",
+    "POST /v1/batch/embeddings",
+    "POST /v1/chat/completions",
+    "POST /v1/classifiers",
+    "POST /v1/classify",
+    "POST /v1/embeddings",
+    "POST /v1/rerank",
+    "POST /v1/train"
+  ],
+  "coverage": {
+    "POST /v1/embeddings": "embeddings",
+    "POST /v1/rerank": "rerank",
+    "POST /v1/classify": "classify",
+    "POST /v1/train": "train_classifier",
+    "GET /v1/classifiers": "catalog:list_classifiers",
+    "POST /v1/classifiers": "catalog:list_classifiers_post",
+    "DELETE /v1/classifiers/{classifier_id}": "catalog:delete_classifier",
+    "GET /v1/models": "catalog:list_models",
+    "GET /v1/models/{model_id}": "catalog:get_model",
+    "POST /v1/chat/completions": "catalog:chat_completions",
+    "POST /v1/batch/embeddings": "catalog:create_batch_embeddings",
+    "GET /v1/batch/{batch_id}": "catalog:get_batch",
+    "DELETE /v1/batch/{batch_id}": "catalog:cancel_batch",
+    "GET /v1/batches": "catalog:list_batches",
+    "GET /v1/batch/{batch_id}/output": "catalog:batch_output",
+    "GET /v1/batch/{batch_id}/errors": "catalog:batch_errors"
+  },
+  "exclusions": {
+    "GET /health": "vendor infrastructure probe",
+    "GET /ready": "vendor infrastructure probe",
+    "GET /live": "vendor infrastructure probe"
+  },
+  "catalog": {
+    "list_classifiers": [
+      "GET",
+      "/v1/classifiers",
+      ""
+    ],
+    "list_classifiers_post": [
+      "POST",
+      "/v1/classifiers",
+      ""
+    ],
+    "delete_classifier": [
+      "DELETE",
+      "/v1/classifiers/",
+      "classifier_id"
+    ],
+    "list_models": [
+      "GET",
+      "/v1/models",
+      ""
+    ],
+    "get_model": [
+      "GET",
+      "/v1/models/",
+      "model_id"
+    ],
+    "chat_completions": [
+      "POST",
+      "/v1/chat/completions",
+      ""
+    ],
+    "create_batch_embeddings": [
+      "POST",
+      "/v1/batch/embeddings",
+      ""
+    ],
+    "get_batch": [
+      "GET",
+      "/v1/batch/",
+      "batch_id"
+    ],
+    "cancel_batch": [
+      "DELETE",
+      "/v1/batch/",
+      "batch_id"
+    ],
+    "list_batches": [
+      "GET",
+      "/v1/batches",
+      ""
+    ],
+    "batch_output": [
+      "GET",
+      "/v1/batch/{batch_id}/output",
+      "batch_id"
+    ],
+    "batch_errors": [
+      "GET",
+      "/v1/batch/{batch_id}/errors",
+      "batch_id"
+    ]
+  },
+  "manual_surfaces": {
+    "read": "https://r.jina.ai",
+    "read_post": "https://r.jina.ai",
+    "search": "https://s.jina.ai",
+    "search_post": "https://s.jina.ai",
+    "embeddings": "https://api.jina.ai/v1/embeddings",
+    "rerank": "https://api.jina.ai/v1/rerank",
+    "classify": "https://api.jina.ai/v1/classify",
+    "train_classifier": "https://api.jina.ai/v1/train",
+    "segment": "https://api.jina.ai/v1/segment",
+    "deepsearch": "https://deepsearch.jina.ai/v1/chat/completions"
+  }
+}

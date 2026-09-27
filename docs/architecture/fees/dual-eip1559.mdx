@@ -1,0 +1,121 @@
+---
+title: Dual EIP-1559 Basefee Mechanism
+description: Independent fee markets for Cycles and Cells
+---
+
+## Introduction
+
+Cowboy implements **two independent EIP-1559 style fee markets**: one for Cycles (computation) and one for Cells (data/storage). Each market has its own basefee that adjusts dynamically based on demand, ensuring fair pricing and preventing congestion.
+
+<Tip>
+  **Key Innovation**: Independent basefees allow compute-heavy and storage-heavy applications to coexist without subsidizing each other.
+</Tip>
+
+> Note: Content on this page is principle-level. Normative specifications (formulas, constraints) are defined in CIP-3.
+
+## EIP-1559 Recap
+
+### Traditional EIP-1559 (Ethereum)
+
+EIP-1559 introduced a **basefee** mechanism to improve fee predictability:
+
+Fee = (gas_used × basefee) + tip
+
+**Key properties**:
+- **Basefee**: Algorithmically adjusted based on block utilization
+- **Burn**: Basefee portion is burned (deflationary)
+- **Tip**: Goes to block producer (incentive for inclusion)
+- **Target**: Blocks aim for 50% utilization
+- **Adjustment**: Basefee increases if over target, decreases if under
+
+**Limitation**: A single gas metric cannot fairly price different resources.
+
+## Cowboy's Dual Basefee System
+
+### Two Independent Markets
+
+- **Cycles market (computation)**
+  - Adjusts the price of compute work (Cycles)
+  - Responds to compute usage; independent of Cells
+- **Cells market (data/storage)**
+  - Adjusts the price of data/storage (Cells)
+  - Responds to data usage; independent of Cycles
+
+### Update Rule (per resource)
+
+- Basefee update (per block, per resource x ∈ [Cycles, Cells]):
+  
+  ```text
+  basefee_new = basefee_old × (1 + (U − T) / T / α)
+  ```
+  - U: usage in parent block; T: target usage (typically 50% of limit)
+  - α: adjustment speed (elasticity multiplier; larger means smoother)
+  - The change is clamped to a maximum per-block percentage (e.g., ±12.5% when α = 8)
+- These parameters and clamping behavior are specified in CIP-3.
+
+## Basefee Properties and Parameters
+
+### Parameters (per CIP‑3)
+
+| Parameter | Symbol | Description |
+|-----------|--------|-------------|
+| **Target Usage** | T | Desired per-block utilization (e.g., 50% of limit) |
+| **Adjustment Speed** | α | Controls how quickly basefee reacts (larger = smoother) |
+| **Max Change** | — | Maximum per-block adjustment (clamped) |
+| **Min Basefee** | — | Non-zero floor to prevent zero basefee |
+
+### Economic Effects
+
+- **Basefee burn (100%)**: The basefee portion of fees is burned, creating a deflationary pressure linked to actual network usage.
+- **Producer tip**: Tips are paid to block producers, forming a priority market layered over the basefee.
+
+## Fee Calculation & Distribution (Per Transaction)
+
+- For each resource:
+  - Basefee payment: usage_x × basefee_x (burned)
+  - Effective tip rate: min(tip_per_x, max_fee_per_x − basefee_x)
+  - Tip payment: usage_x × effective_tip_rate (to producer)
+- Totals across both resources are the sum of their respective components.
+
+## Comparative Analysis
+
+### vs. Traditional EIP-1559 (Ethereum)
+
+| Feature | Ethereum (Single) | Cowboy (Dual) |
+|---------|------------------|---------------|
+| **Resource Types** | 1 (gas) | 2 (Cycles + Cells) |
+| **Basefees** | 1 | 2 (independent) |
+| **Markets** | 1 (coupled) | 2 (decoupled) |
+| **Fairness** | Mixed subsidy | Pricing per resource |
+| **Predictability** | Medium | High (resource-specific) |
+
+## System Dynamics (Conceptual)
+
+EIP-1559 creates a negative feedback loop: when usage exceeds target, basefee increases to temper demand; when usage is below target, basefee decreases to stimulate demand. With two independent markets, this loop operates separately for compute and data, improving fairness and stability.
+
+## Best Practices (Principle-Level)
+
+- **Specify both dimensions**: Provide max_fee_per_cycle/cell and tip_per_cycle/cell based on workload characteristics.
+- **Estimate usage**: Use conservative estimates of Cycles (compute) and Cells (data) based on code paths and payload sizes.
+- **Bound tips**: Choose tips proportional to urgency; rely on basefee for price discovery, tips for prioritization.
+- **Protect with max fees**: Set per-resource max fees to cap total spend under volatility.
+
+## Next Steps
+
+<CardGroup cols={3}>
+  <Card title="Fee Overview" icon="money-bill" href="/architecture/fees/overview">
+    Introduction to dual-metered gas model
+  </Card>
+  <Card title="Metering Points" icon="location-dot" href="/architecture/fees/metering-points">
+    Where Cycles and Cells are charged
+  </Card>
+  <Card title="Worked Example" icon="calculator" href="/architecture/fees/worked-example">
+    Complete transaction cost calculation
+  </Card>
+</CardGroup>
+
+## Further Reading
+
+- [Fee Model Overview](/architecture/fees/overview)
+- [Metering Points Reference](/architecture/fees/metering-points)
+- [Worked Example](/architecture/fees/worked-example)

@@ -1,0 +1,113 @@
+---
+title: CLI Developer Experience
+description: Vision, command overview, and project structure for the Cowboy CLI
+icon: terminal
+---
+
+## Vision
+
+The Cowboy CLI (`cowboy`) is the primary tool for developers building on the Cowboy blockchain. It handles project scaffolding, wallet management, actor development, token operations, data feeds, and deployment -- all from a single binary.
+
+**Design principles:**
+
+- **Zero-config start** -- `cowboy init dev` creates project config and a devnet wallet in one command.
+- **Convention over configuration** -- Keys live in `.cowboy/`, actors live in `actors/`, and the CLI finds them automatically.
+- **Explicit over magic** -- Every command shows what it does. No hidden state, no surprise network calls.
+- **Network-aware** -- Commands target `local` or `dev`. The network choice affects defaults (RPC URL, faucet, chain ID).
+
+## Command Overview
+
+| Command | Purpose |
+|---------|---------|
+| `cowboy version` | Print CLI version |
+| `cowboy init <network>` | Scaffold a project, generate wallet, fund via faucet |
+| `cowboy status` | Show network status (height, mempool, sync, basefee) |
+| `cowboy wallet` | Create and manage secp256k1 wallets (create, address, balance, upgrade, mnemonic) |
+| `cowboy account` | Query account info (balance, nonce, info) |
+| `cowboy actor new <name>` | Scaffold a new actor from a template |
+| `cowboy actor deploy` | Deploy an actor and atomically invoke its `init` handler |
+| `cowboy actor execute` | Call an actor handler |
+| `cowboy actor get` | Query actor state |
+| `cowboy actor address` | Compute actor address without deploying |
+| `cowboy actor logs` | Fetch actor event log |
+| `cowboy upgrade-actor` | Upgrade an actor's code (system deployers only) |
+| `cowboy fund-actor` | Fund an actor's balance so it can pay gas |
+| `cowboy entitlement` | Grant scoped permissions between actors / accounts |
+| `cowboy volume` | CIP-9 volume operations (mount, cat, info) |
+| `cowboy transfer` | Transfer CBY between accounts |
+| `cowboy transaction` | Submit and query transactions (submit, get, status) |
+| `cowboy block` | Query blocks (by-height, by-hash, latest) |
+| `cowboy query` | Bulk queries (blocks, transactions) |
+| `cowboy runner` | Runner operations (get, list, register) |
+| `cowboy job` | Off-chain compute jobs (get, status, runners, results, verified, submit) |
+| `cowboy token` | CIP-20 token operations (create, transfer, approve, mint, burn, freeze, unfreeze, info, balance, list) |
+| `cowboy watchtower` | Data feed operations (init, new feed, publish, subscribers, list, feeds) |
+
+All commands that need a private key or RPC URL use [auto-discovery](/cli-specs/key-auto-discovery).
+
+## Project Structure
+
+After `cowboy init dev`, the project has CLI configuration. Actor files are created separately with `cowboy actor new <name>`:
+
+```
+my-project/
+├── .cowboy/
+│   ├── keys/
+│   │   └── dev                # secp256k1 private key (PEM format, 0600)
+│   └── config.json            # Environments, active network, watchtower registry
+└── actors/                    # Created by `cowboy actor new <name>`
+    └── hello/
+        └── main.py
+```
+
+### Key conventions
+
+- **`.cowboy/keys/<network>`** — Per-environment secp256k1 private key (PEM). Never overwritten by re-running `cowboy init`.
+- **`.cowboy/config.json`** — `{ "active": "<network>", "environments": { ... } }`. Each environment stores `rpc_url`, `key_file`, optional `watchtower_registry` and optional `identity`.
+- **`actors/`** — Each subdirectory is one actor. Created on demand by `cowboy actor new <name>`; not part of `cowboy init`.
+
+## Networks
+
+| Network | Default RPC URL | Faucet |
+|---------|-----------------|--------|
+| `local` | `http://localhost:4000` | Built-in (`POST /faucet`) |
+| `dev`   | `https://rpc.mesa.cowboylabs.net` | Built-in (`POST /faucet`) |
+| `summit` | Not yet available (mainnet, TBD) | — |
+
+## Zero-Config Workflow
+
+After running `cowboy init dev` and scaffolding an actor, commands use the discovered key and RPC URL:
+
+```bash
+cowboy actor new hello
+
+# Deploy an actor and call its init() handler atomically in one transaction.
+cowboy actor deploy --code actors/hello/main.py    # key + rpc auto-discovered
+
+cowboy actor execute --actor 0x... --handler increment --payload 0x  # same
+cowboy transfer --to 0x... --amount 100            # same
+cowboy wallet balance                              # same
+```
+
+Explicit `--private-key` and `--rpc-url` flags still work and take priority.
+
+See individual spec files for detailed behavior:
+
+- [cowboy init](/cli-specs/cowboy-init)
+- [cowboy wallet](/cli-specs/cowboy-wallet)
+- [cowboy actor new](/cli-specs/cowboy-actor-new)
+- [cowboy actor](/cli-specs/cowboy-actor)
+- [cowboy upgrade-actor](/cli-specs/cowboy-upgrade-actor)
+- [cowboy fund-actor](/cli-specs/cowboy-fund-actor)
+- [cowboy entitlement](/cli-specs/cowboy-entitlement)
+- [cowboy volume](/cli-specs/cowboy-volume)
+- [cowboy status](/cli-specs/cowboy-status)
+- [cowboy transfer](/cli-specs/cowboy-transfer)
+- [cowboy account](/cli-specs/cowboy-account)
+- [cowboy transaction](/cli-specs/cowboy-transaction)
+- [cowboy block](/cli-specs/cowboy-block)
+- [cowboy query](/cli-specs/cowboy-query)
+- [cowboy runner & job](/cli-specs/cowboy-runner-job)
+- [cowboy token](/cli-specs/cowboy-token)
+- [cowboy watchtower](/cli-specs/cowboy-watchtower)
+- [Key auto-discovery](/cli-specs/key-auto-discovery)

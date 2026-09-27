@@ -1,0 +1,42 @@
+---
+title: "cowboy transfer"
+description: Transfer CBY between accounts on the Cowboy blockchain
+icon: arrow-right-arrow-left
+---
+
+## Synopsis
+
+```bash
+cowboy transfer --to <address> --amount <cby> [--rpc-url <url>] [--private-key <path>]
+```
+
+## Behavior
+
+1. Load the private key using [key auto-discovery](/cli-specs/key-auto-discovery).
+2. Build a Transfer transaction sending `amount` CBY to the `--to` address.
+3. The amount is specified in CBY and converted internally (1 CBY = 10^9 wei).
+4. Sign and submit the transaction.
+5. Print the transaction hash.
+
+## Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--to` | Required | Recipient address (hex) |
+| `--amount` | Required | Amount to transfer in CBY |
+| `--rpc-url` | Auto-discovered | RPC endpoint |
+| `--private-key` | Auto-discovered | Path to private key file |
+
+## Example
+
+```bash
+$ cowboy transfer --to 0x1a2B...C3D4 --amount 100
+Transaction: 0xabc123...
+Transferred 100 CBY to 0x1a2B...C3D4
+```
+
+## Edge Cases
+
+- If the sender has insufficient balance, the transaction will be rejected by the chain.
+- If the recipient address doesn't exist on-chain, the chain creates a new account.
+- Amount must be a positive integer.

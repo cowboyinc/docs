@@ -1,0 +1,15 @@
+[project]
+name = "hn-feed"
+version = "0.0.0"
+requires-python = ">=3.11"
+# cowboy-sdk is loaded from a node checkout by conftest.py until 0.1.2 is on
+# PyPI; see examples/_sdk_path.py.
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest==9.1.1"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib"]
+pythonpath = [".", "../.."]

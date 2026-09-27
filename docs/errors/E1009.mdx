@@ -1,0 +1,44 @@
+---
+title: "E1009 — Missing required signer"
+description: "Missing required signer"
+---
+
+# E1009 — Missing required signer
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1009` |
+| **Slug** | `E1009` |
+| **Category** | `validation` (Validation) |
+
+
+## What happened
+
+Missing required signer.
+
+## Why it happened
+
+The transaction requires a cosignature that was not included.
+
+## How to fix
+
+Include a signature from the required signer in the transaction.
+
+## Receipt example
+
+```json
+{
+  "code": 1009,
+  "slug": "E1009",
+  "category": "validation",
+  "what": "Missing required signer",
+  "fix": "Include a signature from the required signer in the transaction.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1009"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

@@ -1,0 +1,466 @@
+---
+title: "Runners, Data Boundaries, and Settlement"
+description: "What Cowboy runners do, what is on-chain, what stays off-chain, and how CBFS, CBSS, incentives, and verification fit together."
+icon: network-wired
+---
+
+## Purpose
+
+This page is a high-level technical overview of Cowboy's runner system and its
+data boundaries. It answers the questions that come up most often:
+
+- What do runners actually do?
+- Which parts of a job end up on-chain?
+- Are runner answers public?
+- What stays in CBFS or CBSS?
+- How do performance, incentives, verification, and crypto fit together?
+
+<Note>
+  This is an architecture overview, not the normative spec. For exact protocol
+  rules, see CIP-2, CIP-9, CIP-11, CIP-23, CIP-24, and CIP-31. It also calls
+  out current implementation behavior where it differs from the target CIP-2
+  aggregator design.
+</Note>
+
+## Short Answers
+
+| Question | Short answer |
+|---|---|
+| Do runner answers end up on-chain? | If a runner submits the answer as the `JobResultSubmit.result` payload, yes. That payload is a signed transaction input, stored by the verifier, and may be passed into the actor callback. Commit-reveal hides it only until reveal. |
+| Can a runner answer stay off-chain? | Yes, if the job writes the large or private output to CBFS and submits only a pointer, hash, CID, compact summary, or encrypted envelope on-chain. |
+| Does CBFS store runner answers? | CBFS stores blobs, artifacts, datasets, mounted volume state, and large outputs when the job writes them there. It does not automatically make every runner answer private; the job/result format decides what is submitted on-chain. |
+| Does CBSS store runner answers? | No. CBSS is for secrets and data-encryption-key release. It stores metadata, wrapped keys, policy, proxy records, and release receipts. Plaintext secrets are not stored on-chain. |
+| Are prompts and job inputs public? | Anything embedded in `JobSpec` is chain-visible. Use CBFS pointers and CBSS-backed secret release for private or large inputs. |
+| Can validators see confidential CBFS or CBSS data? | Not if the job uses the intended private path. Validators see metadata, commitments, wrapped keys, receipts, and pointers. The selected runner-side process fetches/decrypts private CBFS objects or CBSS releases off-chain. |
+| Can an actor privately branch on secret data? | No. Actor execution is replayed by validators. If plaintext reaches actor state, callback args, logs, or deterministic PVM execution, it is public chain data. Use runner-side processing and return only a public summary, commitment, or pointer. |
+| Do validators run the off-chain job? | No. Validators deterministically record jobs, select runners, verify submitted result data, and settle callbacks/payments. The non-deterministic LLM/API/MCP work happens in runner processes after finalization. |
+| Is a runner trusted? | It depends on the verification mode. Single-runner jobs are trust/economic-bond oriented. Multi-runner jobs use threshold/majority/structured verification, commit-reveal, reputation, stake, and slashing. TEE jobs add attestation gates. |
+
+## Mental Model
+
+Cowboy separates deterministic chain execution from non-deterministic external
+work.
+
+```text
+Actor / user tx
+  |
+  | on-chain: JobSubmit
+  v
+Job Dispatcher
+  | validates + escrows + selects runner committee
+  v
+Runner(s)
+  | off-chain: LLM, HTTP, MCP, custom executor, agent, CBFS reads/writes
+  v
+Result Verifier
+  | on-chain: commit/reveal, verify submitted result bytes, settle
+  v
+Actor callback
+```
+
+The chain owns ordering, eligibility, deterministic runner selection, state
+commitments, result verification over submitted bytes, callbacks, payment, and
+slashing. Runners own the actual external execution.
+
+<Warning>
+  Validators cannot privately consume confidential plaintext. Anything a
+  contract/actor reads during deterministic execution is replayed by validators
+  and is therefore public to the chain. Confidential inputs must stay in the
+  runner-side data plane; the chain should receive only public outputs,
+  commitments, hashes, pointers, receipts, or encrypted envelopes.
+</Warning>
+
+## Main Components
+
+| Component | Address / location | Role |
+|---|---:|---|
+| Runner Registry | `0x01` | Runner registration, stake, rate card, capabilities, health, reputation, delegation. |
+| Job Dispatcher | `0x02` | Job validation, escrow, candidate filtering, deterministic selection, assignments, timeouts. |
+| Result Verifier | `0x03` | Commit-reveal, result aggregation, verification modes, callback scheduling, settlement, slashing. |
+| Secrets Manager / CBSS | `0x04` | Secret metadata, wrapped DEKs, proxy committees, release receipts, policy. |
+| TEE Verifier | `0x05` | TEE attestation state and validation gates. |
+| Entitlement Registry | `0x07` | Runner pool membership and other permission checks. |
+| Governance | `0x09` | Tunable runner settlement, reputation, aggregator, committee, and other protocol parameters. |
+| Storage Manager | `0x0A` | CBFS volume commitments, CapTokens, mounted-volume control plane. |
+| Relay Registry | `0x0B` | CBFS relay profiles, storage economics, challenge/slashing state. |
+| MPP Session Actor | `0x0C` | Escrowed sessions and cumulative off-chain vouchers for high-frequency runner billing. |
+
+## Job Lifecycle
+
+### 1. Actor submits a job
+
+An actor or client submits a job request. The node normalizes it into a
+canonical `JobSpec` and stamps protocol-owned fields such as `job_id`,
+`submitter`, and `submitted_at`.
+
+Typical `JobSpec` content includes:
+
+- job type: `Llm`, `Http`, `Mcp`, `Custom`, `Agent`, or chain-root publication
+- resource bounds
+- verification mode, runner count, and threshold
+- price cap and tip
+- timeout
+- callback actor and handler
+- optional runner pool requirement
+- optional CBFS volume attachments
+
+Important privacy rule: if the prompt, URL, headers, parameters, or callback
+payload are in `JobSpec`, they are chain-visible. Do not put plaintext secrets
+or private payloads directly in `JobSpec`.
+
+### 2. Dispatcher filters runners
+
+Candidate filtering is an on-chain deterministic state transition. The
+dispatcher can filter by:
+
+- registered and healthy runner state
+- minimum stake and dynamic stake relative to declared max job value
+- reputation threshold
+- advertised job type and executor capabilities
+- TEE capability, if required
+- rate card and price cap
+- current capacity / active job count
+- entitlement / runner pool membership
+- CBFS storage support and `encryption_pubkey`, if the job mounts volumes
+
+The filtered set is sorted deterministically so every validator sees the same
+candidate list.
+
+### 3. Dispatcher selects the committee
+
+Runner selection is deterministic and verifiable. The current design uses a
+weighted Fisher-Yates draw, with weight based on effective stake and reputation
+(`stake * sqrt(reputation)`, with a cold-start floor). Anyone with the same
+state and seed can recompute the selection.
+
+Single-runner jobs can be assigned immediately. Multi-runner jobs use the
+delayed seed / pending-selection machinery described by CIP-2 and CIP-11 so the
+committee cannot be steered by the block proposer.
+
+### 4. Runner receives and executes
+
+Current implementation: runners poll the chain/RPC for jobs assigned to their
+address.
+
+CIP-11 target: selected runners keep authenticated connections to validators,
+receive pushed `JobAssignment` frames, and self-rebroadcast their signed result
+transactions if inclusion is not observed.
+
+The actual job execution is off-chain. Runners may:
+
+- call an LLM provider or local model
+- make HTTP requests
+- call MCP tools
+- run a custom executor
+- mount CBFS volumes for reads and writes
+- request just-in-time secrets or volume keys through CBSS
+- produce TEE attestations for TEE-gated modes
+
+For private jobs, the runner process is the component that crosses into the
+private data plane. It can fetch ciphertext shards from CBFS relays, obtain
+release material from CBSS proxies, unwrap the relevant key locally, and use the
+plaintext in memory for the job. Validators do not perform those CBFS reads or
+CBSS decryptions while producing or verifying blocks.
+
+That boundary is also the main product-design constraint: if the actor callback
+needs the full plaintext answer, then the answer is no longer private from
+validators. Private workflows should have the runner write the full artifact to
+private CBFS and submit only a pointer, content hash, manifest root, proof,
+receipt, or compact public summary on-chain.
+
+### 5. Result submission and reveal
+
+For `verification.runners == 1`, the runner can submit `JobResultSubmit`
+directly. The verifier accepts the result under the selected single-runner
+verification model.
+
+For multi-runner jobs, current code uses commit-reveal:
+
+```text
+commitment = keccak256(result_bytes || runner_address || salt)
+```
+
+First, each assigned runner submits `JobResultCommit` on-chain. Later, during
+the reveal window, each runner submits `JobResultSubmit` with the result bytes
+and salt. The verifier recomputes the commitment and rejects mismatches.
+
+The CIP-2 target design additionally describes a designated aggregator that
+collects reveals off-chain and submits an evidence bundle. That is a gas and
+coordination optimization. The trust boundary is the same: the verifier judges
+submitted evidence on-chain; the aggregator is not the source of truth.
+
+### 6. Verification and callback
+
+The Result Verifier does not re-run the LLM/API/MCP job. It verifies over the
+already-submitted result data:
+
+- `None`: single result accepted without consensus
+- `EconomicBond`: single runner with economic accountability
+- `MajorityVote`: largest matching bucket wins if it meets threshold
+- `StructuredMatch`: schema/field/range/tolerance checks
+- `Deterministic`: byte match for reproducible results
+- `SemanticSimilarity`: model-pinned similarity clustering
+- DNS checks: specialized pass/fail aggregation for TXT/CNAME checks
+
+On success, the verifier stores a `VerifiedResult`, marks the job completed,
+removes it from runner assignment queues, and schedules the actor callback.
+
+The callback payload is also chain-visible. If the callback stores the result
+in actor state or emits it as an event, that result remains public chain data.
+
+## Data Visibility
+
+### On-chain and public
+
+Treat this as public to validators, RPC nodes, indexers, and later chain
+observers.
+
+| Data | Notes |
+|---|---|
+| Transaction envelope and instruction bytes | Includes `JobSubmit`, `JobResultCommit`, `JobResultSubmit`, runner registration, heartbeat, CBSS/RAS instructions, session operations. |
+| `JobSpec` | Job type, params, bounds, verification config, callback, prices, attachments metadata, and any inline prompt or request data. |
+| Runner registry records | Address, stake, rate card, capabilities, health, heartbeat height, reputation, delegation config, storage support, optional encryption pubkey. |
+| Runner commitments | Hashes hide the result only before reveal. They are public commitments. |
+| Revealed runner result payloads | Public if submitted in `JobResultSubmit.result`. This is the main answer to "do runner answers end up on-chain?" |
+| Verified results and callback payloads | Public if stored in verifier state, actor state, events, or receipts. |
+| CBFS control-plane records | Volume commitments, manifest roots, billing/challenge state, and CapToken-related control state. Private volume contents are not in these records. |
+| CBSS control-plane records | Key hashes, metadata, wrapped DEKs, proxy records, receipts, liveness-challenge state. Plaintext secret values are not on-chain. |
+| Settlement and slashing effects | Account balances, burned fees, treasury receipts, stake changes, reputation updates. |
+
+### Off-chain but not inherently private
+
+| Data | Notes |
+|---|---|
+| Runner execution logs and local caches | Operator-controlled. Not chain-public, but not protocol-private from the runner operator. |
+| LLM/API/MCP provider traffic | Visible to the provider unless the workload uses a privacy-preserving transport or TEE boundary. |
+| CIP-11 presence/transport data | Mostly off-chain transport state. Some committed presence inputs/evidence may be chain-visible depending on mode. |
+| MPP session vouchers before settlement | Payer and runner exchange cumulative vouchers off-chain. The chain stores session state and the latest settled amounts/nonces, not every request. |
+
+### Off-chain and designed for confidentiality
+
+| Data | Notes |
+|---|---|
+| Private CBFS object bytes | Client-side encrypted before leaving the client/runner. Relay nodes hold opaque shards. |
+| Private CBFS manifests | Encrypted Merkle-DAG nodes. The on-chain `manifest_root` commits to ciphertext, not plaintext paths. |
+| Plaintext volume DEKs | Generated and used client-side or inside the authorized runner/TEE path. Stored only wrapped, never as plaintext chain state. |
+| CBSS plaintext secrets | Stored encrypted in CBFS, released just in time through threshold proxy flow. Validators do not see plaintext. |
+
+Confidential does not mean invisible to the selected runner. If the job needs a
+runner to call an API with a secret, that runner process receives the secret or
+derived credential at execution time. TEE mode can reduce host/operator exposure,
+but the protocol still needs a runtime that can use the value.
+
+## CBFS Boundary
+
+CBFS is Cowboy's durable blob/data plane. It stores objects as shards across
+relay nodes and gives Cowboy a way to keep large or private data out of chain
+state.
+
+For private volumes:
+
+- the client/runner encrypts data before sharding
+- relay nodes see only opaque shard IDs and ciphertext
+- manifests are encrypted
+- the chain stores commitments, roots, policy, and billing state
+
+For public volumes:
+
+- object and manifest data are plaintext
+- anyone can read and verify against the committed root
+- writes still require authorization
+
+Use CBFS for:
+
+- large runner outputs
+- agent workspace state
+- tool outputs and intermediate artifacts
+- datasets and model artifacts
+- private files mounted into runner jobs
+- callback payloads where the chain should only see a pointer and hash
+
+CBFS is not automatic privacy for an on-chain result. If a runner writes
+`answer.json` to CBFS and then also submits the same answer in
+`JobResultSubmit.result`, the answer is public.
+
+## CBSS Boundary
+
+CBSS is the secret-release system. It is not a general result store.
+
+CBSS exists so actors and accounts can use credentials without writing
+plaintext secrets into actor code, transaction payloads, or chain state.
+
+The intended flow is:
+
+1. Owner stores an encrypted secret in a private CBFS volume.
+2. Chain records secret metadata, policy, key hash, wrapped DEK, and release
+   key/committee state.
+3. At job time, an authorized runner requests release.
+4. A threshold of CBSS proxies returns release material.
+5. The runner combines the material, unwraps the DEK, and uses the secret in
+   memory for that job.
+
+Chain-visible values are metadata and cryptographic envelopes. Plaintext secret
+values are not chain-visible. Plaintext key names are kept out of chain storage
+paths and transaction args, but common key names may still be guessable from
+hashes and may appear in actor manifests or local CLI input.
+
+The on-chain `0x04` actor is the registry and accounting surface for this flow,
+not a place where validators decrypt or execute with secret plaintext. CBSS
+proxy daemons and the runner-side secrets client do the threshold release work
+off-chain. If an implementation routes the secret through `JobSpec`,
+`JobResultSubmit.result`, callback args, actor storage, or logs, that specific
+flow has opted out of confidentiality.
+
+## Performance Model
+
+Cowboy keeps slow or non-deterministic work off the validator hot path.
+
+Validators do:
+
+- execute deterministic PVM and system instructions
+- write job and runner state
+- compute deterministic selection
+- verify submitted result bytes
+- update account/state roots
+- schedule callbacks and settle payment
+
+Validators do not:
+
+- call LLMs
+- make HTTP requests for a job
+- run MCP tools
+- read private CBFS blobs during block execution
+- decrypt CBSS secrets during block execution
+
+The cost drivers for a runner job are:
+
+- one `JobSubmit` transaction
+- one assignment write per selected runner
+- for multi-runner jobs, one `JobResultCommit` per runner
+- one `JobResultSubmit` reveal per runner, unless the aggregator path is used
+- verifier work over submitted bytes
+- callback execution
+- result payload size in cells
+- CBFS read/write latency and erasure-coding overhead, if mounted volumes are used
+
+Latency drivers:
+
+- block inclusion and finalization
+- current polling interval, until CIP-11 push delivery replaces polling on the hot path
+- runner execution time
+- commit and reveal windows for multi-runner jobs
+- callback scheduling
+- CBFS relay latency for attached volumes
+
+Design consequence: small public answers can be returned inline. Large,
+expensive, or private artifacts should be stored in CBFS and represented
+on-chain by a pointer, hash, manifest root, or compact verified summary.
+Inline results are for bounded public data, not arbitrary blobs.
+
+## Incentives
+
+Runner economics are built around stake, price caps, reputation, settlement, and
+slashing.
+
+Registration and eligibility:
+
+- runners stake CBY to register
+- the minimum self-stake floor is 10,000 CBY, represented in chain units by
+  the active code constants
+- stake must also cover at least 1.5x the runner's declared max job value
+- runners advertise rate cards, job types, regions, TEE support, storage
+  support, DNS capability, and other capabilities
+- selection weight uses effective stake, including active delegated stake, and
+  reputation
+
+Payment:
+
+- `max_price + tip` is escrowed at job submission when positive
+- default job settlement split is 89% runner share, 10% burn, 1% treasury
+- the split is governance-configurable
+- when the aggregator bonus path applies, the default bonus is 150 bps
+  (1.5% of gross job payment), carved out of the runner share
+- delegation can split a runner's base payout with its delegators
+
+Penalties:
+
+- timeouts reduce reputation and can trigger replacement selection
+- repeated timeouts can put a runner on probation
+- minority or invalid results can be slashed
+- commit-without-reveal can be classified as operational failure if a valid
+  crash attestation exists; otherwise it is slashable dishonesty
+- deregistration is blocked while assigned jobs, active delegation, or dispute
+  cooldowns remain
+
+Storage incentives are separate:
+
+- CBFS relays earn storage and transfer fees
+- storage fees default to a 10% burn, 1% challenge pool, 89% relay split
+- proof-of-retrievability misses or fraud can slash relay stake
+
+MPP sessions are also separate:
+
+- a payer escrows a session ceiling once
+- payer and runner exchange cumulative vouchers off-chain
+- runner settles the latest voucher on-chain periodically or at close
+- the chain stores the session state, not every micro-call
+
+## Crypto and Trust Boundaries
+
+Cowboy uses several cryptographic mechanisms for different jobs:
+
+| Mechanism | Used for | Boundary |
+|---|---|---|
+| Transaction signatures | User, runner, and system instruction authorization | Authenticates who submitted a transaction. |
+| Consensus state roots | Chain state commitment | Validators agree on deterministic state transitions. |
+| Runner selection seed + weighted draw | Verifiable committee selection | Anyone can recompute selected runners from committed state/seed. |
+| Commit-reveal | Multi-runner result anti-copying | Hides answers before reveal; not permanent confidentiality. |
+| CBFS encryption + BLAKE3 roots | Private blobs and manifest integrity | Relay nodes store ciphertext shards; root commits to volume state. |
+| CBSS threshold release | Secret and DEK release | No single dispatcher/validator can unwrap secrets; threshold proxy non-collusion is the trust root. |
+| TEE attestation | Optional confidential or attested execution | Adds hardware/operator attestation gates. It is not a substitute for CBSS threshold release. |
+| EIP-712 session vouchers | MPP session billing | Off-chain cumulative authorization, settled on-chain by latest voucher. |
+
+The chain is the public settlement and verification layer. CBFS and CBSS provide
+private data and secret-management layers around it. Runners are the execution
+layer that crosses between both worlds.
+
+## Current vs Target Behavior
+
+The docs and CIPs describe both implemented behavior and target protocol shape.
+When answering design questions, separate these:
+
+| Area | Current implementation shape | Target / spec direction |
+|---|---|---|
+| Job delivery | Runners poll assigned jobs by address. | CIP-11 push delivery over authenticated runner-validator connections, with polling as fallback. |
+| Multi-runner reveal | Each runner can submit commit and reveal transactions individually. | CIP-2 also specifies a designated aggregator that collects reveals off-chain and submits one evidence bundle when practical. |
+| TEE verification | Interim trusted-key/operator-root model exists for some paths. | CIP-23 target is chip-root plus operator-root verification, with SNARK-compressed hardware attestation. |
+| Large/private outputs | Use CBFS pointers/hashes by job convention. | Same principle, with tighter SDK ergonomics and RAS mounts. |
+| Secrets | CBSS control plane exists for encrypted secret metadata and release flows. | Threshold IBE release is the target trust model; TEE is optional additional gating, not the primary trust root. |
+
+## Practical Design Rules
+
+1. If it must be private, do not put it directly in `JobSpec`,
+   `JobResultSubmit.result`, actor state, or event logs.
+2. Use CBFS for large outputs, private artifacts, workspace state, and mounted
+   files.
+3. Use CBSS for API keys, credentials, and volume DEK release.
+4. Keep secret-dependent branching inside the runner when the branch condition
+   itself is confidential.
+5. Return a pointer plus hash on-chain when the full answer should stay
+   off-chain.
+6. Use multi-runner verification when the result is public and independently
+   reproducible or checkable.
+7. Use TEE modes when the runner must process confidential data and an
+   attestation policy is acceptable.
+8. Keep callbacks compact. A callback that writes or emits the full answer makes
+   it public again.
+
+## Further Reading
+
+- [CIP-2: Verifiable Off-Chain Compute](/cips/cip-2-offchain-compute)
+- [CIP-9: Runner-Backed Storage](/cips/cip-9-runner-storage)
+- [CIP-11: Runner Connectivity](/cips/cip-11-runner-connectivity)
+- [CIP-23: TEE Execution](/cips/cip-23-tee-execution)
+- [CIP-24: Cowboy Secret Service](/cips/cip-24-secrets-manager)
+- [CIP-31: CBFS Rent Schedule](/cips/cip-31-cbfs-rent-schedule)
+- [Off-Chain Task Lifecycle](/architecture/offchain/lifecycle)

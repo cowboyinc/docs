@@ -1,0 +1,44 @@
+---
+title: "E1608 — No consensus reached"
+description: "No consensus reached"
+---
+
+# E1608 — No consensus reached
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1608` |
+| **Slug** | `E1608` |
+| **Category** | `runner` (Runner / Consensus) |
+| **CIP** | CIP-2 |
+
+## What happened
+
+No consensus reached.
+
+## Why it happened
+
+Runners returned divergent results and no majority could be established.
+
+## How to fix
+
+Runners returned divergent results. Consider simplifying the task or using deterministic mode.
+
+## Receipt example
+
+```json
+{
+  "code": 1608,
+  "slug": "E1608",
+  "category": "runner",
+  "what": "No consensus reached",
+  "fix": "Runners returned divergent results.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1608"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

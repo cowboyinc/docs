@@ -1,0 +1,93 @@
+---
+title: "cowboy block"
+description: Query block information on the Cowboy blockchain
+icon: cube
+---
+
+## Synopsis
+
+```bash
+cowboy block by-height --height <n>
+cowboy block by-hash --hash <hex>
+cowboy block latest
+```
+
+## Subcommands
+
+### `cowboy block by-height`
+
+Retrieve a block by its height.
+
+**Behavior:**
+
+1. Query the RPC endpoint for the block at the given height.
+2. Print block details (hash, height, timestamp, transaction count).
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--height` | Required | Block height (integer) |
+
+**Example:**
+
+```bash
+$ cowboy block by-height --height 142
+Block #142
+  Hash: 0xdef789...
+  Timestamp: 2026-03-09T12:00:00Z
+  Transactions: 5
+```
+
+---
+
+### `cowboy block by-hash`
+
+Retrieve a block by its hash.
+
+**Behavior:**
+
+1. Query the RPC endpoint for the block with the given hash.
+2. Print block details.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--hash` | Required | Block hash (hex) |
+
+**Example:**
+
+```bash
+$ cowboy block by-hash --hash 0xdef789...
+Block #142
+  Hash: 0xdef789...
+  Timestamp: 2026-03-09T12:00:00Z
+  Transactions: 5
+```
+
+---
+
+### `cowboy block latest`
+
+Retrieve the latest block.
+
+**Behavior:**
+
+1. Query the RPC endpoint for the latest block.
+2. Print block details.
+
+**Example:**
+
+```bash
+$ cowboy block latest
+Block #142
+  Hash: 0xdef789...
+  Timestamp: 2026-03-09T12:00:00Z
+  Transactions: 5
+```
+
+## Edge Cases
+
+- If the requested height doesn't exist, print `Block not found`.
+- All subcommands are read-only and do not require a private key.

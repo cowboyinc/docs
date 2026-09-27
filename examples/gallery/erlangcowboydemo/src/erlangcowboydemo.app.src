@@ -1,0 +1,11 @@
+{application, erlangcowboydemo,
+ [{description, "Erlang/OTP fundamentals demo for Cowboy blockchain team"},
+  {vsn, "0.2.0"},
+  {registered, []},
+  {mod, {erlangcowboydemo_app, []}},
+  {applications, [kernel, stdlib]},
+  {env, [
+    {workers, [alpha, bravo, charlie, delta]},
+    {sinks, [mailbox_sink]}
+  ]}
+ ]}.

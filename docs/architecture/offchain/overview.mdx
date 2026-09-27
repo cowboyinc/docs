@@ -1,0 +1,229 @@
+---
+title: Off-Chain Compute Overview
+description: Understanding Cowboy's verifiable off-chain computation framework
+---
+
+## Introduction
+
+Cowboy's **Verifiable Off-Chain Compute** framework enables actors to outsource heavy computation, AI model inference, and external data fetching to a decentralized network of "Runners" while maintaining verifiability and trust minimization.
+
+<Tip>
+  **Key Innovation**: Actors can run computationally expensive tasks off-chain with cryptographic verification, without sacrificing decentralization or security.
+</Tip>
+
+> Note: Examples and names in this page are conceptual and illustrative (non-normative). Final interfaces and usage should follow the SDK and Developer Guide; normative behavior follows the Off-chain architecture documents.
+
+## The Problem
+
+### On-Chain Computation Limits
+
+Traditional smart contracts face severe computational constraints:
+
+On-chain execution is intentionally constrained: no external network access, no large model loading, and bounded per‑transaction computation. Heavy compute and external data access must be handled via the off‑chain framework.
+
+### Current Solutions Fall Short
+
+<Tabs>
+  <Tab title="Oracles (e.g., Chainlink)">
+    **Approach**: Trusted off-chain nodes provide data
+    
+    **Problems**:
+    - ❌ Limited to data fetching
+    - ❌ Cannot run custom computation
+    - ❌ Trust assumptions
+    - ❌ Expensive for frequent updates
+    - ❌ Not suitable for AI/ML
+  </Tab>
+  
+  <Tab title="Optimistic Rollups">
+    **Approach**: Execute off-chain, verify on-chain via fraud proofs
+    
+    **Problems**:
+    - ❌ Still limited to EVM-compatible computation
+    - ❌ Cannot access external APIs
+    - ❌ Cannot run ML models
+    - ❌ Challenge period delays
+  </Tab>
+  
+  <Tab title="ZK Rollups">
+    **Approach**: Execute off-chain, prove with ZK-SNARKs
+    
+    **Problems**:
+    - ❌ Limited to specific computations
+    - ❌ No external API access
+    - ❌ Proof generation expensive
+    - ❌ Circuit complexity limits
+  </Tab>
+  
+  <Tab title="Centralized Services">
+    **Approach**: Trust centralized provider
+    
+    **Problems**:
+    - ❌ Single point of failure
+    - ❌ No verification
+    - ❌ Censorship risk
+    - ❌ Trust assumptions
+  </Tab>
+</Tabs>
+
+## Cowboy's Solution: Decentralized Runners
+
+### Core Architecture
+
+```
++------------------------------------------------------------------+
+|                      Actor (On-Chain)                            |
+|  - Submits task definition                                       |
+|  - Specifies verification requirements                           |
+|  - Receives results asynchronously                               |
++-------------------------------+----------------------------------+
+                                | Task Submission
+                                v
++------------------------------------------------------------------+
+|           Task Dispatcher (On-Chain Contract)                    |
+|  - Stores task specifications                                    |
+|  - Locks payment                                                 |
+|  - Snapshots VRF seed + active runner list                       |
++-------------------------------+----------------------------------+
+                                | VRF Selection (Deterministic)
+                                v
++------------------------------------------------------------------+
+|               Runner Network (Off-Chain)                         |
+|  - Selected runners execute task                                 |
+|  - Download models/data as needed                                |
+|  - Generate proofs if required                                   |
+|  - Submit results on-chain                                       |
++-------------------------------+----------------------------------+
+                                | Result Submission
+                                v
++------------------------------------------------------------------+
+|        Runner Submission Contract (On-Chain)                     |
+|  - Validates runner selection                                    |
+|  - Validates result size                                         |
+|  - Triggers callback when N results collected                    |
++-------------------------------+----------------------------------+
+                                | Deferred Callback
+                                v
++------------------------------------------------------------------+
+|                 Actor Callback (On-Chain)                        |
+|  - Receives all results                                          |
+|  - Chooses winning result                                        |
+|  - Triggers payment distribution                                 |
++------------------------------------------------------------------+
+```
+
+### Key Components
+
+<CardGroup cols={2}>
+  <Card title="Task Dispatcher" icon="paper-plane">
+    On-chain contract for task submission and payment management
+  </Card>
+  <Card title="Runner Registry" icon="server">
+    Manages runner registration, staking, and active list
+  </Card>
+  <Card title="VRF Selection" icon="shuffle">
+    Deterministic, verifiable runner assignment
+  </Card>
+  <Card title="Result Schemas" icon="file-contract">
+    Mandatory specifications for task inputs/outputs
+  </Card>
+</CardGroup>
+
+## How It Works
+
+### Step-by-Step Workflow
+
+<Steps>
+  <Step title="1. Task Submission">
+    Actor submits `task_definition` with mandatory `result_schema`, providing `num_runners`, `timeout_blocks`, and `proof_type_requested`.
+    
+    **What happens**:
+    - Task stored in Dispatcher state
+    - Payment locked (3 × 100 = 300 CBY)
+    - VRF seed snapshot taken
+    - Active runner list snapshot taken
+    - `TaskSubmitted` event emitted
+  </Step>
+  
+  <Step title="2. VRF-Based Runner Selection">
+    Runners independently compute selection using the VRF seed snapshot and the active runner list at submission (CIP‑2). Anyone can verify selection on-chain.
+    
+    **Key properties**:
+    - ✅ Deterministic (same inputs → same selection)
+    - ✅ Verifiable (anyone can check on-chain)
+    - ✅ Decentralized (no coordinator)
+    - ✅ Fair (equal probability over time)
+  </Step>
+  
+  <Step title="3. Off-Chain Execution">
+    Selected runners execute off‑chain, optionally generating proofs/attestations per requested verification mode, and then submit results on‑chain.
+  </Step>
+  
+  <Step title="4. Result Submission">
+    Submission enforces runner selection, `result_schema` bounds, and proof/attestation checks; when N valid results are stored, a deferred callback is scheduled (CIP‑1/CIP‑2).
+  </Step>
+  
+  <Step title="5. Deferred Callback">
+    Deferred callback is created and scheduled under the scheduler’s per‑block budget (CIP‑1).
+  </Step>
+  
+  <Step title="6. Callback Execution">
+    Actor callback selects the consumed result (e.g., quorum for N‑of‑M) and calls `consume_result(task_id, consumed_runner_address)` to finalize payment (CIP‑2).
+  </Step>
+  
+  <Step title="7. Payment Distribution">
+    Dispatcher verifies the consumed result and distributes payment to the selected runner(s), refunding any unused portion to the actor; the task is finalized.
+  </Step>
+</Steps>
+
+## Verification Models
+
+Developers choose the verification model based on their trust/cost trade-offs:
+
+<Tabs>
+  <Tab title="N-of-M Consensus">
+    **How it works**: Run task on N runners, require M matching results.
+    
+    **Trust model**: Economic security + honest majority
+    
+    **Cost**: Medium (pay N runners)
+    
+    **Use cases**:
+    - Price oracles
+    - General computation
+    - Data aggregation
+    
+    
+  </Tab>
+  
+  <Tab title="Zero-Knowledge Proofs">
+    **How it works**: Runner provides ZK proof of correct computation.
+    
+    **Trust model**: Cryptographic guarantee
+    
+    **Cost**: Higher computation (proof generation)
+    
+    **Use cases**:
+    - Privacy-sensitive computations
+    - Complex verification
+    - Single-runner trust minimization
+    
+    
+  </Tab>
+  
+  <Tab title="TEE Attestation">
+    **How it works**: Execution in Trusted Execution Environment (SGX/SEV).
+    
+    **Trust model**: Hardware security + attestation
+    
+    **Cost**: High (specialized hardware, performance overhead)
+    
+    **Use cases**:
+    - Confidential data processing
+    - Private model inference
+    - Regulated computation
+    
+  </Tab>
+</Tabs>
+  
+  

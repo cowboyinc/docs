@@ -1,0 +1,34 @@
+# Slack app manifest for a Ranchhand tenant. Each hirer creates their OWN
+# Slack app from this manifest (https://api.slack.com/apps → From manifest),
+# installs it to their workspace, and captures:
+#   - Bot User OAuth Token (xoxb-…)  → CBSS secret RANCHHAND_SLACK_BOT_TOKEN
+#   - Signing Secret                 → CBSS secret RANCHHAND_SLACK_SIGNING_SECRET
+# Replace <gateway-host> with the ranchhand gateway host printed by deploy.sh.
+display_information:
+  name: Ranchhand
+  description: Cowboy-hired Slack assistant
+features:
+  bot_user:
+    display_name: Ranchhand
+    always_online: true
+oauth_config:
+  scopes:
+    bot:
+      - app_mentions:read
+      - channels:history
+      - chat:write
+      - im:history
+      - im:read
+      - im:write
+      - users:read
+settings:
+  event_subscriptions:
+    request_url: https://<gateway-host>/slack/events
+    bot_events:
+      - app_mention
+      - message.im
+  interactivity:
+    is_enabled: false
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

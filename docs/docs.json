@@ -1,0 +1,346 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "name": "Cowboy Protocol",
+  "theme": "mint",
+  "colors": {
+    "primary": "#E58200",
+    "light": "#FFAD33",
+    "dark": "#A85700"
+  },
+  "fonts": {
+    "heading": {
+      "family": "Season Mix VF",
+      "source": "/fonts/SeasonMixVF.woff2",
+      "format": "woff2"
+    },
+    "body": {
+      "family": "Season Sans VF",
+      "source": "/fonts/SeasonSansVF.woff2",
+      "format": "woff2"
+    }
+  },
+  "logo": {
+    "dark": "/assets/logo/dark.png",
+    "light": "/assets/logo/light.png"
+  },
+  "favicon": "/images/favicon.png",
+  "appearance": {
+    "default": "light",
+    "strict": true
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Support",
+        "href": "mailto:Support@cowboy.io"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "GitHub",
+      "href": "https://github.com/cowboyinc/cowboy"
+    }
+  },
+  "anchors": [
+    {
+      "name": "Whitepaper",
+      "icon": "file-pdf",
+      "url": "/whitepaper/cowboy-technical-whitepaper"
+    },
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/cowboyinc/cowboy"
+    }
+  ],
+  "navigation": {
+    "groups": [
+      {
+        "group": "Start Here",
+        "pages": [
+          "index",
+          "introduction/what-is-cowboy",
+          "introduction/reader-paths",
+          "getting-started/quickstart",
+          "getting-started/troubleshooting",
+          "getting-started/faq"
+        ]
+      },
+      {
+        "group": "Build",
+        "pages": [
+          "developers/your-first-actor",
+          "architecture/actor-vm/minimal-actor",
+          "developers/testing-actors",
+          "developers/working-with-tokens",
+          "developers/submitting-jobs",
+          "developers/runtime-api",
+          "developers/sdk",
+          "developers/sdk-reference",
+          "developers/tx-format",
+          "developers/best-practices",
+          "developers/examples",
+          "developers/annotated-examples"
+        ]
+      },
+      {
+        "group": "How Cowboy Works",
+        "pages": [
+          "overview/architecture",
+          "overview/design-principles",
+          {
+            "group": "Actor VM & Determinism",
+            "pages": [
+              "architecture/actor-vm/overview",
+              "architecture/actor-vm/actor-identity",
+              "architecture/actor-vm/determinism-and-sandbox",
+              "architecture/actor-vm/resource-limits",
+              "architecture/actor-vm/pvm-reference"
+            ]
+          },
+          {
+            "group": "Fee Model: Cycles & Cells",
+            "pages": [
+              "architecture/fees/overview",
+              "architecture/fees/dual-eip1559",
+              "architecture/fees/metering-points",
+              "architecture/fees/worked-example"
+            ]
+          },
+          {
+            "group": "Timers & Actor Message Scheduler",
+            "pages": [
+              "architecture/scheduler/overview",
+              "architecture/scheduler/sequence-diagram",
+              "architecture/scheduler/dos-parameters"
+            ]
+          },
+          {
+            "group": "Verifiable Off-chain Compute",
+            "pages": [
+              "architecture/offchain/overview",
+              "architecture/offchain/runners-data-boundaries",
+              "architecture/offchain/lifecycle",
+              "architecture/offchain/callback-timeout-challenge"
+            ]
+          },
+          {
+            "group": "Transactions & Message Flow",
+            "pages": [
+              "architecture/tx/tx-fields",
+              "architecture/tx/idempotency",
+              "architecture/tx/reentrancy"
+            ]
+          },
+          {
+            "group": "Consensus",
+            "pages": [
+              "architecture/consensus/overview"
+            ]
+          },
+          {
+            "group": "State & Storage",
+            "pages": [
+              "architecture/storage/overview"
+            ]
+          },
+          {
+            "group": "Block Lifecycle",
+            "pages": [
+              "architecture/execution/block-lifecycle"
+            ]
+          },
+          {
+            "group": "Entitlements",
+            "pages": [
+              "architecture/entitlements/overview",
+              "architecture/entitlements/entitlements-specification"
+            ]
+          },
+          {
+            "group": "Keys & Wallets",
+            "pages": [
+              "architecture/keys/key-format"
+            ]
+          },
+          "economics/tokenomics",
+          "economics/flows",
+          "ethereum/technical-integration"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "style/glossary",
+          {
+            "group": "Protocol Specifications",
+            "pages": [
+              "cips/cip-1-actor-scheduler",
+              "cips/cip-2-offchain-compute",
+              "cips/cip-3-fee-model",
+              "cips/cip-4-storage",
+              "cips/cip-5-timers",
+              "cips/cip-6-sdk",
+              "cips/cip-7-simple-stream-protocol",
+              "cips/cip-8-mpp-session",
+              "cips/cip-9-runner-storage",
+              "cips/cip-10-runner-containers",
+              "cips/cip-11-runner-connectivity",
+              "cips/cip-12-governance",
+              "cips/cip-13-runner-delegation",
+              "cips/cip-14-dns-addressable-actors",
+              "cips/cip-15-public-asset-hosting",
+              "cips/cip-15-gateway-implementation",
+              "cips/cip-17-verifiable-state-read",
+              "cips/cip-18-payments",
+              "cips/cip-19-gateway-mcp-ingress",
+              "cips/cip-20-fungible-tokens",
+              "cips/cip-21-liquidity-pools",
+              "cips/cip-22-continuous-clearing-auctions",
+              "cips/cip-26-account-libraries",
+              "cips/cip-28-cowboy-agent-banking",
+              "references/bankactor-interface",
+              "cips/cip-29-on-chain-event-hooks",
+              "cips/cip-31-cbfs-rent-schedule",
+              "cips/cip-33-actor-hiring-and-distribution",
+              "cips/cip-34-cross-chain-settlement-near-intents",
+              "cips/cip-39-cowboy-queue-system",
+              "cips/cip-42-statusz",
+              "cips/cip-43-access-meter"
+            ]
+          },
+          {
+            "group": "CLI Specifications",
+            "pages": [
+              "cli-specs/summary",
+              "cli-specs/cowboy-init",
+              "cli-specs/cowboy-status",
+              "cli-specs/cowboy-wallet",
+              "cli-specs/cowboy-actor-new",
+              "cli-specs/cowboy-actor",
+              "cli-specs/cowboy-upgrade-actor",
+              "cli-specs/cowboy-fund-actor",
+              "cli-specs/cowboy-entitlement",
+              "cli-specs/cowboy-volume",
+              "cli-specs/cowboy-transfer",
+              "cli-specs/cowboy-account",
+              "cli-specs/cowboy-transaction",
+              "cli-specs/cowboy-block",
+              "cli-specs/cowboy-query",
+              "cli-specs/cowboy-runner-job",
+              "cli-specs/cowboy-token",
+              "cli-specs/cowboy-watchtower",
+              "cli-specs/key-auto-discovery"
+            ]
+          },
+          {
+            "group": "References",
+            "pages": [
+              "references/rpc-api",
+              "references/configuration",
+              "references/cross-references"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "operations/deployment",
+              "operations/snapshots-and-restore",
+              "operations/incident-response"
+            ]
+          },
+          {
+            "group": "Error Reference",
+            "pages": [
+              "errors/overview"
+            ]
+          },
+          {
+            "group": "Whitepaper",
+            "pages": [
+              "whitepaper/cowboy-technical-whitepaper",
+              "whitepaper/cowboy-design-decisions"
+            ]
+          },
+          {
+            "group": "Style & Documentation",
+            "pages": [
+              "style/styleguide",
+              "assets/naming-conventions",
+              "assets/term-lint"
+            ]
+          },
+          {
+            "group": "Contributing",
+            "pages": [
+              "eng-workflow",
+              "getting-started/repo-layout",
+              "contributing/how-to-propose"
+            ]
+          },
+          {
+            "group": "Versioning & Updates",
+            "pages": [
+              "versioning/strategy",
+              "versioning/changelog"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footerSocials": {
+    "github": "https://github.com/cowboyinc/cowboy"
+  },
+  "feedback": {
+    "thumbsRating": true,
+    "suggestEdit": true,
+    "raiseIssue": true
+  },
+  "search": {
+    "prompt": "Search Cowboy documentation..."
+  },
+  "api": {
+    "playground": {
+      "mode": "simple"
+    }
+  },
+  "redirects": [
+    {
+      "source": "/quickstart",
+      "destination": "/getting-started/quickstart"
+    },
+    {
+      "source": "/source-layout",
+      "destination": "/getting-started/repo-layout"
+    },
+    {
+      "source": "/overview/key-innovations",
+      "destination": "/introduction/what-is-cowboy"
+    },
+    {
+      "source": "/security/dos-limits",
+      "destination": "/architecture/actor-vm/resource-limits"
+    },
+    {
+      "source": "/cli-specs/00-summary",
+      "destination": "/cli-specs/summary"
+    },
+    {
+      "source": "/cli-specs/01-cowboy-init",
+      "destination": "/cli-specs/cowboy-init"
+    },
+    {
+      "source": "/cli-specs/02-cowboy-wallet",
+      "destination": "/cli-specs/cowboy-wallet"
+    },
+    {
+      "source": "/cli-specs/03-cowboy-actor-new",
+      "destination": "/cli-specs/cowboy-actor-new"
+    },
+    {
+      "source": "/cli-specs/05-key-auto-discovery",
+      "destination": "/cli-specs/key-auto-discovery"
+    }
+  ]
+}

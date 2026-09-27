@@ -1,0 +1,123 @@
+---
+title: Examples
+description: What the current Cowboy examples teach and how to run them
+icon: laptop-code
+---
+
+## Overview
+
+The examples are the fastest way to study larger Cowboy actor patterns after you have a Cowboy source checkout. If you are starting from an installed `cowboy` CLI only, begin with [Quickstart](/getting-started/quickstart) and [Your First Actor](/developers/your-first-actor); those pages work from a normal project directory.
+
+The source checkout's `examples/` directory is split into three tracks:
+
+- `examples/core/` — numbered new-developer curriculum.
+- `examples/gallery/` — unnumbered applied showcases and product-shaped patterns.
+- `examples/tooling/` — local testing and workflow helpers.
+
+The shared sweep runs the active core curriculum by default and can switch to the gallery with `--gallery`.
+
+## Run The Sweep
+
+Run commands from the source checkout's `examples/` directory:
+
+```bash
+# Run the full sweep against mesa
+./run_examples.sh
+
+# Show full Cowboy CLI output for each command
+./run_examples.sh --verbose
+
+# Run against canyon
+./run_examples.sh --server canyon
+
+# Reuse an already-running local validator
+./run_examples.sh --server local
+
+# Use a custom RPC URL
+./run_examples.sh --server http://localhost:4000
+
+# Start a temporary validator, then run the sweep
+./run_examples.sh --spawn-local
+
+# Run gallery examples instead of the core curriculum
+./run_examples.sh --gallery
+```
+
+Run one swept example by passing its current path, id, or slug:
+
+```bash
+./run_examples.sh 00
+./run_examples.sh core/05-tokens-and-balances
+./run_examples.sh runner-llm
+./run_examples.sh --gallery hn-feed
+./run_examples.sh --spawn-local core/12-capstone-agent
+```
+
+## What You Learn
+
+### Core Curriculum
+
+| Example | What It Shows |
+|---|---|
+| `core/00-quickstart-hello` | Deploy, initialize, execute, and read one actor |
+| `core/01-state-events-queries` | Stateful storage, emitted events, and query handlers |
+| `core/02-senders-and-permissions` | Caller identity, owner checks, and delegated roles |
+| `core/03-two-actor-messaging` | Deferred actor-to-actor messaging |
+| `core/04-multi-actor-workflow` | Request, validation, and settlement across actors |
+| `core/05-tokens-and-balances` | CIP-20 token creation, transfers, approvals, minting, and burning |
+| `core/06-token-escrow` | Buyer, seller, and escrow custody lifecycle |
+| `core/07-timers-and-automation` | Autonomous timer work |
+| `core/08-minimal-runner-continuation` | Smallest runner continuation and callback pattern |
+| `core/09-runner-llm` | LLM-backed actor response |
+| `core/10-async-cache-refresh` | Async refresh with cheap synchronous cached reads |
+| `core/11-failure-recovery` | Pending, failed, retried, and recovered async states |
+| `core/12-capstone-agent` | Permissions plus LLM-backed proposal review |
+
+### Gallery
+
+| Example | What It Shows |
+|---|---|
+| `gallery/liquidity-pools` | Constant-product liquidity pools |
+| `gallery/rebalancing-agent` | Deterministic portfolio drift analysis |
+| `gallery/copy-trading` | Disclosure and wallet-copying strategy actors |
+| `gallery/spam-detection` | AI-assisted content classification |
+| `gallery/contract-summarizer` | Contract summarization and risk analysis |
+| `gallery/hn-feed` | CIP-7 open stream starter with deterministic ingest |
+| `gallery/watchtower` | Canonical CIP-7 Watchtower Form 4 reference |
+| `gallery/casino-rounds` | Token-backed casino rounds |
+| `gallery/blackjack` | CIP-20 chip escrow blackjack |
+| `gallery/cowbot` | Experimental Slack bot with CBFS and runner-agent prerequisites |
+
+Some heavier gallery examples are intentionally outside the default sweep because they require external credentials, extra Python packages, CBSS-capable infrastructure, or app setup. Use each example's local `README.md` and smoke command for those paths.
+
+## Suggested Path
+
+If you want a short builder path through the current examples, study these in order:
+
+1. `core/00-quickstart-hello`
+2. `core/01-state-events-queries`
+3. `core/02-senders-and-permissions`
+4. `core/03-two-actor-messaging`
+5. `core/08-minimal-runner-continuation`
+6. `core/09-runner-llm`
+7. `core/12-capstone-agent`
+
+That path moves from basic chain interactions to state, permissions, actor messaging, runner continuations, LLM-backed callbacks, and a complete capstone workflow.
+
+## Targeting
+
+- `--server mesa` uses `${MESA_RPC_URL:-http://validator.mesa.cowboylabs.net:4000}`
+- `--server canyon` uses `${CANYON_RPC_URL:-http://validator.canyon.cowboylabs.net:4000}`
+- `--server local` uses `${LOCAL_RPC_URL:-http://localhost:${RPC_PORT:-5000}}`
+- `--server http://...` or `--server https://...` targets a custom RPC URL
+- `--spawn-local` starts an isolated temporary local validator for the run
+- `--verbose` prints the full raw Cowboy CLI output instead of the compact command/result view
+
+Runner-backed examples require at least one registered runner on the target network. Keep the runner's stake and operating balance separate: stake is locked for eligibility, while the spendable balance pays gas for heartbeat transactions and result submissions.
+
+## See Also
+
+- [Your First Actor](/developers/your-first-actor)
+- [Minimal Actor](/architecture/actor-vm/minimal-actor)
+- [Runtime API](/developers/runtime-api)
+- [Verifiable Off-chain Compute](/architecture/offchain/overview)

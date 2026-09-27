@@ -1,0 +1,44 @@
+---
+title: "E1410 — Transfer hook execution failed"
+description: "Transfer hook execution failed"
+---
+
+# E1410 — Transfer hook execution failed
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1410` |
+| **Slug** | `E1410` |
+| **Category** | `token` (Token (CIP-20)) |
+| **CIP** | CIP-20 |
+
+## What happened
+
+Transfer hook execution failed.
+
+## Why it happened
+
+The transfer hook actor raised an exception during execution.
+
+## How to fix
+
+Inspect the hook actor's error in `context.traceback`.
+
+## Receipt example
+
+```json
+{
+  "code": 1410,
+  "slug": "E1410",
+  "category": "token",
+  "what": "Transfer hook execution failed",
+  "fix": "Inspect the hook actor's error in `context.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1410"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

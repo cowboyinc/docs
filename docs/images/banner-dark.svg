@@ -1,0 +1,59 @@
+<svg width="1200" height="300" viewBox="0 0 1200 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient for dark mode -->
+  <defs>
+    <linearGradient id="bgGradientDark" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#0a0f0d;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f1512;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="textGradientDark" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#4ADE80;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#18E299;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#22D3EE;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="iconGradient1Dark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#18E299;stop-opacity:0.2" />
+      <stop offset="100%" style="stop-color:#15803D;stop-opacity:0.2" />
+    </linearGradient>
+    
+    <linearGradient id="iconGradient2Dark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#16A34A;stop-opacity:0.2" />
+      <stop offset="100%" style="stop-color:#4ADE80;stop-opacity:0.2" />
+    </linearGradient>
+    
+    <linearGradient id="iconGradient3Dark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4ADE80;stop-opacity:0.2" />
+      <stop offset="100%" style="stop-color:#0D9373;stop-opacity:0.2" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="300" fill="url(#bgGradientDark)"/>
+  
+  <!-- Decorative geometric shapes (inspired by the logo) -->
+  <path d="M 50 60 Q 70 75 80 105 L 70 135 Q 60 120 50 105 Z" fill="url(#iconGradient1Dark)"/>
+  <path d="M 80 75 Q 95 90 100 120 L 90 150 Q 80 128 75 113 Z" fill="url(#iconGradient2Dark)"/>
+  <path d="M 100 105 Q 110 128 110 150 L 95 165 Q 90 143 95 120 Z" fill="url(#iconGradient3Dark)"/>
+  
+  <path d="M 1120 165 Q 1140 180 1150 210 L 1140 240 Q 1130 225 1120 210 Z" fill="url(#iconGradient1Dark)"/>
+  <path d="M 1100 180 Q 1115 195 1120 225 L 1110 255 Q 1100 233 1095 218 Z" fill="url(#iconGradient2Dark)"/>
+  <path d="M 1080 210 Q 1090 233 1090 255 L 1075 270 Q 1070 248 1075 225 Z" fill="url(#iconGradient3Dark)"/>
+  
+  <!-- Subtle connecting lines -->
+  <line x1="130" y1="120" x2="330" y2="150" stroke="#4ADE80" stroke-width="0.5" opacity="0.3"/>
+  <line x1="870" y1="150" x2="1070" y2="225" stroke="#4ADE80" stroke-width="0.5" opacity="0.3"/>
+  
+  <!-- Main text -->
+  <text x="600" y="125" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="48" font-weight="600" text-anchor="middle" fill="url(#textGradientDark)">
+    A Layer 1 blockchain for autonomous agents
+  </text>
+  
+  <text x="600" y="185" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="48" font-weight="600" text-anchor="middle" fill="url(#textGradientDark)">
+    and verifiable computation
+  </text>
+  
+  <!-- Subtle underline accent -->
+  <rect x="320" y="210" width="560" height="2" fill="#4ADE80" opacity="0.4" rx="1"/>
+</svg>
+

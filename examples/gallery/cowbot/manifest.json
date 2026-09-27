@@ -1,0 +1,26 @@
+{
+  "entitlements": [
+    {
+      "id": "http.fetch",
+      "params": {
+        "allowlist_domains": ["slack.com"],
+        "max_requests": 16
+      }
+    },
+    {
+      "id": "secrets.read",
+      "params": {
+        "keys": ["OWNER_EOA:SLACK_BOT_TOKEN"]
+      }
+    },
+    {
+      "id": "secrets.verify",
+      "params": {
+        "keys": ["OWNER_EOA:SLACK_SIGNING_SECRET"]
+      }
+    },
+    {
+      "id": "storage.kv"
+    }
+  ]
+}

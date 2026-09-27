@@ -1,0 +1,270 @@
+---
+title: "cowboy wallet"
+description: Create and manage secp256k1 wallets for Cowboy
+icon: wallet
+---
+
+## Synopsis
+
+```bash
+cowboy wallet create [--output <path>]
+cowboy wallet address [--key <path>]
+cowboy wallet balance [--key <path>] [--rpc-url <url>]
+cowboy wallet upgrade [--key <path>]
+cowboy wallet create-mnemonic [--output <path>] [--index <n>]
+cowboy wallet import-mnemonic --mnemonic <phrase> [--output <path>] [--index <n>]
+cowboy wallet accounts --mnemonic <phrase> [--count <n>]
+```
+
+## Subcommands
+
+### `cowboy wallet create`
+
+Generate a new secp256k1 keypair and write the private key to a PEM file.
+
+**Behavior:**
+
+1. Generate a cryptographically random secp256k1 private key.
+2. Write the 32-byte private key in PEM envelope format to the output file.
+3. Print the public address (EVM-style checksum hex).
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output` | `.cowboy/key` | Path to write the private key file |
+
+**Example:**
+
+```bash
+$ cowboy wallet create
+Created wallet:
+  Private key: .cowboy/key
+  Address: 0x7a3B...F92E
+```
+
+**Edge cases:**
+
+- If the output file already exists, print an error and exit. Do not overwrite.
+- Create parent directories (`.cowboy/`) if they don't exist.
+
+---
+
+### `cowboy wallet address`
+
+Print the public address derived from a private key file.
+
+**Behavior:**
+
+1. Load the private key using [key auto-discovery](/cli-specs/key-auto-discovery).
+2. Derive the secp256k1 public key.
+3. Print the EVM-style checksum hex address (20-byte, `0x`-prefixed).
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--key` | Auto-discovered | Path to private key file |
+
+**Example:**
+
+```bash
+$ cowboy wallet address
+0x7a3B...F92E
+```
+
+---
+
+### `cowboy wallet balance`
+
+Query the account balance from the chain.
+
+**Behavior:**
+
+1. Load the private key using [key auto-discovery](/cli-specs/key-auto-discovery).
+2. Derive the public address.
+3. Send `GET /account/<address>` to the RPC endpoint.
+4. Print the balance in CBY.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--key` | Auto-discovered | Path to private key file |
+| `--rpc-url` | From `.cowboy/config.json` or `http://localhost:4000` | RPC endpoint |
+
+**Example:**
+
+```bash
+$ cowboy wallet balance
+Address: 0x7a3B...F92E
+Balance: 1000.000000 CBY
+Nonce: 0
+```
+
+**Edge cases:**
+
+- If the account doesn't exist on-chain, print `Balance: 0 CBY` (not an error).
+- If the RPC endpoint is unreachable, print an error with the URL that was tried.
+
+---
+
+### `cowboy wallet upgrade`
+
+Convert a hex-format private key file to PEM envelope format.
+
+**Behavior:**
+
+1. Load the private key file (auto-discovered or explicit path).
+2. If the file is already in PEM format, print a message and exit (no-op).
+3. If the file is in hex format, re-encode as PEM and overwrite the file in-place.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--key` | Auto-discovered | Path to private key file |
+
+**Example:**
+
+```bash
+$ cowboy wallet upgrade
+Upgraded .cowboy/key from hex to PEM format.
+```
+
+**Edge cases:**
+
+- If the key is already PEM, prints a message and exits successfully without modifying the file.
+- Both hex (64-char string) and `0x`-prefixed hex are accepted as input.
+
+---
+
+### `cowboy wallet create-mnemonic`
+
+Generate a new BIP-39 mnemonic phrase and derive a secp256k1 private key from it.
+
+**Behavior:**
+
+1. Generate a random 12-word BIP-39 mnemonic phrase.
+2. Derive a secp256k1 private key using HD derivation path `m/44'/60'/0'/0/<index>`.
+3. Write the private key in PEM format to the output file.
+4. Print the mnemonic phrase and derived address.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output` | `.cowboy/key` | Path to write the private key file |
+| `--index` | `0` | HD derivation index |
+
+**Example:**
+
+```bash
+$ cowboy wallet create-mnemonic
+Mnemonic: abandon ability able about above absent absorb abstract absurd abuse access accident
+  Private key: .cowboy/key
+  Address: 0x1a2B...C3D4
+  Derivation: m/44'/60'/0'/0/0
+
+IMPORTANT: Write down your mnemonic phrase and store it securely.
+           It cannot be recovered if lost.
+```
+
+**Edge cases:**
+
+- If the output file already exists, print an error and exit. Do not overwrite.
+
+---
+
+### `cowboy wallet import-mnemonic`
+
+Import an existing BIP-39 mnemonic phrase and derive a private key from it.
+
+**Behavior:**
+
+1. Validate the provided mnemonic phrase (must be valid BIP-39).
+2. Derive a secp256k1 private key using HD derivation path `m/44'/60'/0'/0/<index>`.
+3. Write the private key in PEM format to the output file.
+4. Print the derived address.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--mnemonic` | Required | BIP-39 mnemonic phrase (quoted string) |
+| `--output` | `.cowboy/key` | Path to write the private key file |
+| `--index` | `0` | HD derivation index |
+
+**Example:**
+
+```bash
+$ cowboy wallet import-mnemonic --mnemonic "abandon ability able about above absent absorb abstract absurd abuse access accident"
+Imported wallet:
+  Private key: .cowboy/key
+  Address: 0x1a2B...C3D4
+  Derivation: m/44'/60'/0'/0/0
+```
+
+**Edge cases:**
+
+- If the mnemonic is invalid, print `Error: Invalid mnemonic phrase` and exit.
+- If the output file already exists, print an error and exit. Do not overwrite.
+
+---
+
+### `cowboy wallet accounts`
+
+List multiple derived addresses from a BIP-39 mnemonic phrase.
+
+**Behavior:**
+
+1. Validate the provided mnemonic phrase.
+2. Derive `count` addresses using sequential HD derivation indices (`m/44'/60'/0'/0/0` through `m/44'/60'/0'/0/<count-1>`).
+3. Print each index and its corresponding address.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--mnemonic` | Required | BIP-39 mnemonic phrase (quoted string) |
+| `--count` | `5` | Number of addresses to derive |
+
+**Example:**
+
+```bash
+$ cowboy wallet accounts --mnemonic "abandon ability able ..." --count 3
+  0  0x1a2B...C3D4
+  1  0x5e6F...A7B8
+  2  0x9c0D...E1F2
+```
+
+**Edge cases:**
+
+- If the mnemonic is invalid, print `Error: Invalid mnemonic phrase` and exit.
+- This command does not write any key files -- it only prints addresses.
+
+## Testing
+
+```bash
+# Create a wallet
+cowboy wallet create
+cat .cowboy/key   # Should be PEM format
+
+# Check address
+cowboy wallet address   # Should print checksum hex address
+
+# Check balance (requires running validator)
+cowboy wallet balance   # Should show 0 CBY for new account
+
+# Upgrade hex key to PEM
+cowboy wallet upgrade
+
+# Generate mnemonic wallet
+cowboy wallet create-mnemonic --output .cowboy/mnemonic-key
+
+# Import mnemonic
+cowboy wallet import-mnemonic --mnemonic "your twelve word phrase ..." --output .cowboy/imported-key
+
+# List derived accounts
+cowboy wallet accounts --mnemonic "your twelve word phrase ..." --count 10
+```

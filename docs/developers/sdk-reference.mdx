@@ -1,0 +1,1907 @@
+---
+title: "SDK Reference"
+description: "Auto-generated reference for the cowboy_sdk public API — signatures and docstrings extracted from source. Do not edit by hand; regenerate with docs/scripts/gen_sdk_reference.py."
+---
+
+{/* GENERATED FILE — do not edit by hand. */}
+{/* Regenerate: python3 docs/scripts/gen_sdk_reference.py (see Developer Guide). */}
+
+This page is generated from the `cowboy_sdk` source docstrings, so it tracks the
+shipped SDK. For tutorials see [Your First Actor](/developers/your-first-actor)
+and the [Runtime API](/developers/runtime-api); for the determinism rules the
+PVM enforces see the [PVM reference](/architecture/actor-vm/pvm-reference).
+
+Where `call()` and `send()` below refer to `payload_codec.CODECS`, the members of
+that set and the behavior of each are documented under **Payload codecs** and
+**Strict JSON codec**; [CIP-6 §9.5](/cips/cip-6-sdk) is the normative version.
+
+## Runtime — host calls (state, time, randomness, timers, tokens)
+
+_Module: `cowboy_sdk.runtime`_
+
+### `mode`
+
+```python
+mode() -> str
+```
+
+Return the current Continuation execution mode.
+
+Returns
+-------
+str
+    "fsm" (production/default), "checkpoint" (development debug only), or "local" (local development)
+
+### `compile_time_fsm`
+
+```python
+compile_time_fsm() -> bool
+```
+
+Whether trusted Rust already lowered continuation decorators this frame.
+
+The host omits this key on the dormant/pre-activation path, preserving the
+historical runtime-config surface. Local development and Checkpoint mode
+continue to use the Python compiler.
+
+### `is_production`
+
+```python
+is_production() -> bool
+```
+
+Whether the current mode is production (on-chain consensus) mode.
+
+### `is_development`
+
+```python
+is_development() -> bool
+```
+
+Whether the current mode is local development mode (no PVM Host).
+
+### `is_checkpoint_mode`
+
+```python
+is_checkpoint_mode() -> bool
+```
+
+Whether the current mode is Checkpoint mode (for debugging only; must never enter consensus).
+In this mode, developers are warned not to deploy to mainnet.
+
+### `require_fsm`
+
+```python
+require_fsm() -> None
+```
+
+Assert that the current mode is FSM (production) mode.
+Raises DeterminismError on violation to prevent Checkpoint from accidentally entering consensus.
+
+### `get_pvm_version`
+
+```python
+get_pvm_version() -> str
+```
+
+Get the PVM version string.
+
+### `get_chain_id`
+
+```python
+get_chain_id() -> int
+```
+
+Get the chain ID.
+
+### `context`
+
+```python
+context() -> Dict[str, Any]
+```
+
+Return the full execution context (read-only).
+
+### `get_sender`
+
+```python
+get_sender() -> bytes
+```
+
+Return the current transaction sender address (20-byte Ethereum address).
+
+### `sender`
+
+```python
+sender() -> 'Address'
+```
+
+Return the current message's sender (the caller) as an ``Address``.
+
+``sender`` is the *caller* of the current message (EVM-style ``msg.sender``),
+read from ``ctx["sender"]``. This is a distinct concept from
+:func:`actor_address` — the actor's *own* address, read from the separate
+``ctx["actor_addr"]`` key. Different keys, different meanings; a handler must
+not conflate "who called me" with "who I am".
+
+Typed counterpart of :func:`get_sender`, which stays available as the
+raw-bytes escape hatch. Returns ``Address.ZERO`` only when no sender is set
+(the raw getter's ``b""``); a corrupt non-20-byte value raises
+``AddressError`` rather than masquerading as the zero address.
+
+### `get_actor_address`
+
+```python
+get_actor_address() -> bytes
+```
+
+Return the current Actor's own address (20-byte Ethereum address).
+
+Prefers pvm_host.self_address(); falls back to context()['actor_addr'].
+
+### `actor_address`
+
+```python
+actor_address() -> 'Address'
+```
+
+Return this Actor's own address as an ``Address``.
+
+``actor_addr`` is the actor *itself*, read from ``ctx["actor_addr"]`` (or
+``pvm_host.self_address()`` when the host exposes it). Distinct from
+:func:`sender`, the caller (``ctx["sender"]``); don't conflate self with
+caller.
+
+Typed counterpart of :func:`get_actor_address`, which stays available as the
+raw-bytes escape hatch. Returns ``Address.ZERO`` only when the address is
+unset (``b""``); a corrupt non-20-byte value raises ``AddressError``.
+
+### `get_tx_hash`
+
+```python
+get_tx_hash() -> bytes
+```
+
+Return the current transaction hash (32 bytes).
+
+### `get_block_height`
+
+```python
+get_block_height() -> int
+```
+
+Return the current block height.
+Prefers pvm_host.current_block(); falls back to context()['block_height'].
+
+### `get_timestamp_ms`
+
+```python
+get_timestamp_ms() -> int
+```
+
+Return the current block timestamp (milliseconds).
+
+### `charge_gas`
+
+```python
+charge_gas(amount: int) -> None
+```
+
+Report gas consumption to the PVM.
+
+### `amm_get_amount_out`
+
+```python
+amm_get_amount_out(amount_in: int, reserve_in: int, reserve_out: int, fee_bps: int) -> int
+```
+
+CIP-21 §1.1: constant-product swap output for ``amount_in``. Cost: 100 cycles.
+
+### `amm_get_amount_in`
+
+```python
+amm_get_amount_in(amount_out: int, reserve_in: int, reserve_out: int, fee_bps: int) -> int
+```
+
+CIP-21 §1.1: input required for a desired ``amount_out`` (rounded up).
+Cost: 100 cycles.
+
+### `amm_quote`
+
+```python
+amm_quote(amount_a: int, reserve_a: int, reserve_b: int) -> int
+```
+
+CIP-21 §1.1: equivalent amount of B for ``amount_a`` of A at the current
+reserve ratio. Cost: 50 cycles.
+
+### `amm_tick_to_sqrt_price`
+
+```python
+amm_tick_to_sqrt_price(tick: int) -> int
+```
+
+CIP-21 §1.2: tick -> sqrt(price) in Q64.96. Cost: 200 cycles.
+
+### `amm_sqrt_price_to_tick`
+
+```python
+amm_sqrt_price_to_tick(sqrt_price: int) -> int
+```
+
+CIP-21 §1.2: sqrt(price) Q64.96 -> tick. Cost: 200 cycles.
+
+### `amm_get_liquidity_for_amounts`
+
+```python
+amm_get_liquidity_for_amounts(sqrt_price_current: int, sqrt_price_lower: int, sqrt_price_upper: int, amount0: int, amount1: int) -> int
+```
+
+CIP-21 §1.2: liquidity for token amounts in a price range. Cost: 300 cycles.
+
+### `amm_get_amounts_for_liquidity`
+
+```python
+amm_get_amounts_for_liquidity(sqrt_price_current: int, sqrt_price_lower: int, sqrt_price_upper: int, liquidity: int) -> tuple
+```
+
+CIP-21 §1.2: (amount0, amount1) for a liquidity in a price range. Cost: 300 cycles.
+
+### `emit_event`
+
+```python
+emit_event(name: str, payload: Any, *, schema: bytes | None = None) -> dict
+```
+
+Send an event to the chain and return its EmitResult dictionary.
+
+Optional ``schema`` is a 32-byte payload schema identifier. Explicit
+declarations must match every explicitly typed subscriber. The identifier
+describes the codec and schema agreed by the parties; payload bytes are not
+parsed or validated by the node.
+
+``emit_id`` identifies this emit within the transaction (starting at 1).
+``sync_outcomes`` contains attempted or skipped synchronous deliveries in
+subscription order: ``sub_id`` (33-byte ID), ``status`` (0 success, 1 handler
+error, 2 skipped/refused), and ``gas_used`` (inclusive subtree cycles).
+``deferred_subs`` lists IDs queued for deferred delivery, including Access
+overflow. Delivery remains subject to transaction commit and child admission.
+
+Encoding: canonical CBOR (invariant I-1), plus a raw hatch keyed on the
+payload's *type*.
+
+- bytes-like (``bytes``/``bytearray``/``memoryview``): the raw hatch — sent
+  verbatim, for a payload that is already serialized.
+- anything else: canonical CBOR via ``codec.encode``. ``None`` emits CBOR
+  null, the faithful encoding of the value that was passed.
+
+Raises ``CodecError`` for a value the codec cannot encode, and for a str that
+is already serialized JSON (see ``_reject_json_string``).
+
+NOT interchangeable with ``send()``, which shares only the non-bytes -> CBOR
+rule. ``send()``'s hatch is the ``raw=`` keyword, not the type, so
+``send(t, b'x')`` CBOR-wraps the bytes where ``emit_event(t, b'x')`` passes
+them verbatim; ``send(t)`` encodes ``b''`` where ``emit_event(t, None)``
+emits CBOR null; and ``send()`` has no JSON-string guard.
+
+NOTE (consensus): the encoded bytes are committed — the host folds them into
+`compute_logs_root` -> `receipt_root`, and bills cells per encoded byte. See
+the flag-day note in docs/dev/cip29-event-hooks.md before changing anything
+here that moves the bytes.
+
+### `get_state`
+
+```python
+get_state(key: bytes) -> Optional[bytes]
+```
+
+Read a raw bytes value from on-chain storage. Prefer self.storage unless raw access is required.
+
+### `set_state`
+
+```python
+set_state(key: bytes, value: bytes) -> None
+```
+
+Write a raw bytes value to on-chain storage. Prefer self.storage unless raw access is required.
+
+Refuses writes to keys in ``RESERVED_KEYS`` — those are managed by the
+SDK and writing them from user code would void the permission and
+ownership guarantees built on top. The reject is enforced both here
+(friendly Python error) and in the Rust host bridge (authoritative).
+
+### `delete_state`
+
+```python
+delete_state(key: bytes) -> None
+```
+
+Delete a key from on-chain storage. Refuses deletes of reserved keys.
+
+### `get_owner`
+
+```python
+get_owner() -> bytes
+```
+
+Return the actor's owner address, or b'' if unset.
+
+The owner lives in a reserved storage slot (``__OWNER__``) that user code
+cannot touch via ``self.storage[]``. Use this — or the OWNER sentinel in
+``@callable_by`` — to gate handlers on ownership.
+
+### `owner`
+
+```python
+owner() -> 'Address'
+```
+
+Return the actor's owner as an ``Address``, or ``Address.ZERO`` if unset.
+
+Typed counterpart of :func:`get_owner`, which stays available as the
+raw-bytes escape hatch. An unset owner — ``b""`` from the raw getter — maps
+to ``Address.ZERO``; test for it with ``runtime.owner().is_zero()``. A
+corrupt non-20-byte owner slot raises ``AddressError`` rather than reading as
+unowned.
+
+### `transfer_ownership`
+
+```python
+transfer_ownership(new_owner: bytes) -> None
+```
+
+Set or transfer the actor's owner.
+
+Bootstrap rule: if no owner is set, ANY caller may set it (typically the
+deployer's first call). Once set, only the current owner may transfer.
+Self-calls (caller == self.address) are always allowed.
+
+Raises
+------
+ValueError
+    If ``new_owner`` is the zero address. ``transfer_ownership`` is for
+    moving control to a real principal; to abandon ownership use the
+    explicit :func:`renounce_ownership` API instead.
+PermissionDeniedError
+    If a non-owner tries to transfer after ownership has been
+    bootstrapped.
+
+### `renounce_ownership`
+
+```python
+renounce_ownership() -> None
+```
+
+Permanently abandon ownership of this actor.
+
+Sets ``__OWNER__`` to the zero address. After this call any
+``@callable_by(OWNER)`` handler becomes unreachable, and ownership cannot
+be re-established (``assume_ownership_if_unowned`` treats a zero-address
+owner as still set). The state change is irrevocable.
+
+Auth rules mirror ``transfer_ownership``:
+
+* If no owner is set, ANY caller may renounce.
+* Once set, only the current owner (or an intra-actor call) may renounce.
+
+Raises
+------
+PermissionDeniedError
+    If a non-owner tries to renounce after ownership has been
+    bootstrapped.
+
+### `assume_ownership_if_unowned`
+
+```python
+assume_ownership_if_unowned() -> bytes
+```
+
+Bootstrap helper: if no owner is set, assign the current sender as owner.
+
+Returns the resulting owner address. Idempotent — does nothing once owner
+is set.
+
+SAFETY: this is a first-caller-wins primitive. Only call it from an
+``init`` handler that runs atomically with deploy (Cowboy's deploy
+machinery runs ``init`` in the same tx as the deploy with sender =
+deployer, eliminating the front-run window — see
+``execution/src/execution/actor_instruction.rs`` H6). If you call this
+from a non-init handler, or deploy without an init_handler and let
+init be invoked in a follow-up tx, any caller can become owner.
+
+    def init(self, payload):
+        runtime.assume_ownership_if_unowned()
+        ...
+
+### `is_initialized`
+
+```python
+is_initialized() -> bool
+```
+
+Return True once a successful ``init`` handler has run on this actor.
+
+The SDK auto-sets the ``__INITIALIZED__`` flag after ``init`` returns
+without raising. Before that, ``init`` is implicitly callable by anyone
+(the atomic-deploy bootstrap window); after, ``init`` follows the same
+deny-by-default rules as every other handler.
+
+### `scan_state_prefix`
+
+```python
+scan_state_prefix(prefix: bytes, limit: int = 100) -> list[tuple[bytes, bytes]]
+```
+
+Return up to `limit` ``(key, value)`` pairs from on-chain storage whose
+user-key starts with ``prefix``, in ascending key order (Model C).
+
+Semantics:
+- Only keys stored in verbatim mode (≤32 bytes) are visible; long keys
+  (hashed mode) are never returned by prefix scan.
+- ``limit`` is clamped to ``MAX_PREFIX_SCAN_LIMIT`` (1000) by the host.
+- Pricing: ``500 + limit × 50`` cycles (by ``limit``, not returned
+  count — prevents "wide scan narrow filter" free lunch) plus
+  ``sum(len(k)+len(v))`` cells for returned entries.
+
+Pagination: pass the last returned key (appended with ``b"\x00"``) as
+the next ``prefix`` to continue past the current page — or use the
+higher-level ``/actors/{addr}/storage`` RPC for offset/cursor pagination.
+
+Returns ``[]`` when no key matches the prefix.
+
+Example:
+    entries = scan_state_prefix(b"user:", limit=50)
+    for key, value in entries:
+        ...
+
+### `send_message`
+
+```python
+send_message(target: bytes, payload: bytes) -> None
+```
+
+Send a raw message to ``target`` (0x-str / 20-byte bytes / Address).
+
+This is the low-level binding (payload is sent verbatim); prefer ``send()``
+for object payloads.
+
+### `call_actor`
+
+```python
+call_actor(target: bytes, method: str, payload: bytes, cycles_limit: int, access_limit: Optional[int] = None) -> bytes
+```
+
+Synchronously call a method on ``target`` (0x-str / 20-byte bytes / Address).
+
+Low-level binding (payload is sent verbatim); prefer ``call()`` for object args.
+``access_limit`` is unscaled nested-frame access authority. The SDK encodes
+omission as the raw-host ``0`` sentinel, which grants floor(63/64 of the
+caller's remaining authority). The Python SDK rejects an explicit SDK ``0``;
+the preserved raw ABI collapses literal ``0`` and omission to that default,
+so the host's ``Some(0)`` rejection is defense in depth and is unreachable
+through this runtime. Strictness is inherited: a child is strict if its
+parent is strict or allowance is below remaining. At remaining ``1``, the
+default is ``0 < 1`` and strict/catchable; at remaining ``0``, it is ``0 ==
+0`` and non-strict/fatal.
+
+### `fork_actor`
+
+```python
+fork_actor(endowment: int = 0) -> bytes
+```
+
+fork() prototype — low-level host binding for the self-clone primitive.
+
+The calling Actor creates a NEW Actor that is a byte-exact copy of itself
+(same code, same storage) at a new deterministic address, and becomes that
+child's parent. Synchronous: returns the 20-byte child address.
+
+``endowment`` is native CBY wei to debit from the parent and credit to the
+child atomically with the fork. ``0`` keeps the child zero-balance.
+
+Prefer the high-level :func:`cowboy_sdk.fork` wrapper in application code.
+
+### `transfer_balance`
+
+```python
+transfer_balance(to: bytes, amount: int) -> None
+```
+
+Move native CBY from this actor's balance to ``to``.
+
+``to``: 0x-str / 20-byte bytes / Address.
+
+### `schedule_timer`
+
+```python
+schedule_timer(height: int, payload: bytes) -> bytes
+```
+
+Schedule a timer that fires at `height`, delivering `payload` to the
+calling actor. Requires the ``timer.schedule`` entitlement. Returns a
+timer id (opaque bytes) that can be passed to ``cancel_timer``.
+
+Uses protocol defaults for ``fee_payer`` (actor pays itself),
+``gas_limit`` (``TimerConfig.max_cycles_per_fire``), ``access_limit``
+(``DEFAULT_TIMER_ACCESS_PER_FIRE``), and ``expires_at``
+(``current_height + TimerConfig.max_ttl_blocks``). Use
+:func:`schedule_timer_ex` to override any of these.
+
+### `schedule_timer_ex`
+
+```python
+schedule_timer_ex(height: int, payload: bytes, fee_payer: Optional[bytes] = None, gas_limit: Optional[int] = None, access_limit: Optional[int] = None, expires_at: Optional[int] = None) -> bytes
+```
+
+Model B schedule with actor-specified economics (CIP-5 §4.1).
+
+Args:
+    height: block height at which the timer fires; MUST be strictly > current.
+    payload: opaque bytes delivered to the handler (max 1 MiB).
+    fee_payer: address debited at each fire (0x-str / 20-byte bytes /
+        Address). ``None`` → actor pays itself. Rejected values: ZERO
+        address and the reserved system-actor band ``0x01..=0x0F``.
+    gas_limit: per-fire cycle cap. ``None`` → ``TimerConfig.max_cycles_per_fire``.
+        Must be ≤ the config cap; ``0`` is rejected.
+    access_limit: declared per-fire committed-store access request.
+        ``None`` → ``DEFAULT_TIMER_ACCESS_PER_FIRE``. Must be ≤ the
+        protocol Timer access cap; ``0`` is rejected.
+    expires_at: absolute block height after which the timer self-destructs.
+        ``None`` → ``current_height + TimerConfig.max_ttl_blocks``. Must
+        be strictly > current and ≤ ``current + max_ttl_blocks``.
+
+Returns the timer id (opaque bytes).
+
+Example — deployer-funded oracle timer with a tighter budget::
+
+    timer_id = schedule_timer_ex(
+        cowboy_sdk.current_block() + 10,
+        b"",
+        fee_payer=self.deployer,
+        gas_limit=200_000,
+        access_limit=32,
+        expires_at=cowboy_sdk.current_block() + 2_592_000,
+    )
+
+### `extend_timer`
+
+```python
+extend_timer(timer_id: bytes, new_expires_at: int) -> None
+```
+
+Renew a timer's ``expires_at`` (Model B.6). Caller must own the timer
+(timer.actor_address == executing actor); cross-actor renewal via this
+syscall is rejected as ``Unauthorized``. ``new_expires_at`` must be
+strictly > current block height and ≤ ``current + TimerConfig.max_ttl_blocks``.
+
+A missing timer (already self-destructed) is a silent no-op — safe to
+call idempotently from a handler that races self-destruct.
+
+### `cancel_timer`
+
+```python
+cancel_timer(timer_id: bytes) -> None
+```
+
+Cancel a previously scheduled timer by its opaque id.
+
+### `schedule_after`
+
+```python
+schedule_after(delay_blocks: int, handler, payload: bytes = None, **opts) -> bytes
+```
+
+Schedule a timer ``delay_blocks`` (≥ 1) blocks from now, routed to
+``handler``.
+
+Delay-relative counterpart of ``timer.schedule``: resolves ``height`` as
+``current + delay_blocks`` and delegates, so both share one encoder. ``opts``
+forwards ``fee_payer`` / ``gas_limit`` / ``expires_at``. Returns the timer id.
+
+### `decode_interval`
+
+```python
+decode_interval(payload: bytes)
+```
+
+If ``payload`` was produced by :func:`set_interval`, return
+``(handler, every_n_blocks, data)``; otherwise return ``None``.
+
+### `set_interval`
+
+```python
+set_interval(every_n_blocks: int, handler: str, data: bytes = b'') -> bytes
+```
+
+Schedule a recurring timer that fires every ``every_n_blocks`` blocks and
+re-arms itself, delivering ``data`` to the named ``handler``.
+
+Built on the one-shot :func:`schedule_timer` (same ``timer.schedule``
+entitlement, same per-fire fee) — recurrence is the SDK re-scheduling on each
+fire, not a new host primitive. The handler MUST keep the interval alive by
+calling :func:`reschedule_interval` (or :func:`dispatch_interval`) with the
+delivered payload; to stop, don't re-arm.
+
+Returns the first timer id. Raises ``ValueError`` if ``every_n_blocks <= 0``.
+
+### `reschedule_interval`
+
+```python
+reschedule_interval(payload: bytes)
+```
+
+Re-arm the next fire of a recurring timer. Call this from your timer handler:
+if ``payload`` came from :func:`set_interval`, the next fire is scheduled
+``every_n_blocks`` ahead and ``(handler, data)`` is returned; otherwise
+returns ``None`` (a plain one-shot timer — nothing to do).
+
+### `dispatch_interval`
+
+```python
+dispatch_interval(payload: bytes, handlers) -> bool
+```
+
+Convenience timer-handler dispatcher for :func:`set_interval`. Given the
+delivered ``payload`` and a ``handlers`` mapping of name → ``callable(data)``,
+re-arm the next fire and invoke the named handler. Returns ``True`` if the
+payload was an interval (and dispatched), ``False`` otherwise.
+
+### `subscribe_event`
+
+```python
+subscribe_event(emitter: bytes, topic: bytes, handler: str, gas_prepaid: int, bid: int = 0, *, schema: bytes | None = None) -> bytes
+```
+
+CIP-29 §2.1: subscribe to a (emitter, topic) for synchronous fan-out.
+
+Charges the calling actor:
+  - SUBSCRIPTION_REGISTRATION_FEE cycles (burned, not refundable)
+  - bid cycles (burned, not refundable)
+  - gas_prepaid cycles (held in gas_remaining, refundable via unsubscribe_event)
+  - cells for the EventSub record + index entry (refundable)
+
+Returns the 33-byte sub_id. Optional ``schema`` is a 32-byte identifier.
+If the emitter has declared a different identifier, the host raises
+``event_schema_mismatch`` (117) before registration fees or writes.
+
+Raises:
+    ValueError: emitter not 20 bytes, topic empty or >64 bytes, handler invalid.
+    HostError: gas_prepaid below MIN_SUBSCRIPTION_GAS_PREPAID; >= 512 subscribers
+               already on this topic; insufficient balance.
+
+### `unsubscribe_event`
+
+```python
+unsubscribe_event(sub_id: bytes) -> int
+```
+
+CIP-29 §2.1: unsubscribe (caller must be the subscriber).
+
+Refunds remaining gas_remaining cycles to the subscriber.
+bid and REGISTRATION_FEE are NOT refundable.
+
+Returns the cycles refunded.
+
+Raises:
+    ValueError: sub_id not 33 bytes.
+    HostError: sub_id not found; caller is not the subscriber.
+
+### `force_unsubscribe_event`
+
+```python
+force_unsubscribe_event(sub_id: bytes) -> None
+```
+
+CIP-29 §2.1: force-remove a subscription (caller must be the emitter).
+
+Refunds remaining gas + cells to the SUBSCRIBER (emitter gets nothing).
+
+Raises:
+    ValueError: sub_id not 33 bytes.
+    HostError: sub_id not found; caller is not the emitter.
+
+### `update_bid`
+
+```python
+update_bid(sub_id: bytes, additional_bid: int) -> int
+```
+
+CIP-29 §2.1: increase the bid for an existing subscription (caller must be subscriber).
+
+additional_bid is burned immediately. The index is re-sorted so a higher
+cumulative bid moves toward the sync-fire window.
+
+Returns the new cumulative bid.
+
+Raises:
+    ValueError: sub_id not 33 bytes; additional_bid < MIN_BID_STEP (1000).
+    HostError: sub_id not found; caller is not the subscriber; bid overflow.
+
+### `topup_subscription`
+
+```python
+topup_subscription(sub_id: bytes, additional_gas: int) -> int
+```
+
+CIP-29 §2.1: add gas to an existing subscription. Any caller may call.
+
+The caller's balance is debited (NOT the subscriber's). Used to keep a
+long-lived subscription alive past initial gas_prepaid exhaustion.
+
+Returns the new gas_remaining.
+
+Raises:
+    ValueError: sub_id not 33 bytes.
+    HostError: sub_id not found; caller balance insufficient.
+
+### `upgrade_self`
+
+```python
+upgrade_self(new_code: bytes, new_manifest: Optional[bytes] = None) -> None
+```
+
+Upgrade the calling actor's code (and optionally its manifest).
+
+The calling actor's current manifest must declare ``sys.upgrade``. If a new
+manifest is provided it must be a subset of the current one (no entitlement
+broadening). On success the new code takes effect from the next handler
+invocation; state (storage, balance, nonce, mailbox) is preserved.
+
+Parameters
+----------
+new_code : bytes
+    The new actor code (e.g., a UTF-8 encoded Python source).
+new_manifest : Optional[bytes]
+    Optional CBOR-encoded ``ActorManifest`` bytes. Pass ``None`` to keep
+    the current manifest.
+
+Raises
+------
+HostError
+    ``missing_entitlement`` if the calling actor lacks ``sys.upgrade``;
+    ``invalid_input`` if the new code or manifest fails validation or the
+    new manifest is not a subset of the current one.
+
+### `submit_job`
+
+```python
+submit_job(payload: bytes) -> None
+```
+
+Submit a Runner Job; the payload is encoded by the caller.
+
+### `intent_deposit`
+
+```python
+intent_deposit(token_id: bytes, amount: int) -> None
+```
+
+CIP-34: deposit ``amount`` of ``token_id`` (str / bytes / TokenId;
+``CBY_SENTINEL`` for native CBY) from this actor into the settlement ledger.
+Enqueues a deferred ``IntentDeposit``; requires the ``econ.intent``
+entitlement.
+
+### `intent_withdraw`
+
+```python
+intent_withdraw(token_id: bytes, amount: int) -> None
+```
+
+CIP-34: withdraw ``amount`` of ``token_id`` (str / bytes / TokenId) from
+the settlement ledger back to this actor. Enqueues a deferred
+``IntentWithdraw``.
+
+### `intent_broadcast`
+
+```python
+intent_broadcast(nonce: int, deadline: int, diffs, kind: str = 'Settle', dest_chain = None, dest_recipient = None) -> None
+```
+
+CIP-34: broadcast a resting Intent for this actor so a solver can later
+match and settle it. ``diffs`` is an iterable of ``(token_id, amount: int)``
+where ``token_id`` is str / bytes / TokenId and ``amount`` is a signed token
+diff (negative = give, positive = want). Enqueues a deferred
+``IntentBroadcast``; requires the ``econ.intent`` entitlement.
+
+``kind`` is ``"Settle"`` (domestic, default) or ``"Withdraw"`` (cross-chain,
+CIP-34 Phase 3); ``dest_chain`` (int) and ``dest_recipient`` (bytes) declare
+the cross-chain destination for a Withdraw intent.
+
+### `randomness`
+
+```python
+randomness(domain: bytes) -> bytes
+```
+
+Get deterministic random bytes.
+
+### `keccak256`
+
+```python
+keccak256(data: bytes) -> bytes
+```
+
+Compute keccak256 (raises an exception if the Host does not provide it).
+
+### `token_create`
+
+```python
+token_create(name: bytes, symbol: bytes, decimals: int, initial_supply: int, max_supply: int | None, transfer_hook: bytes | None, metadata_uri: bytes | None) -> bytes
+```
+
+Create a new platform token. Returns token_id (32 bytes).
+
+``transfer_hook`` (optional) is an address: str / bytes / Address.
+
+### `token_balance_of`
+
+```python
+token_balance_of(token_id: bytes, owner: bytes) -> int | None
+```
+
+Query token balance for owner. ``token_id``: str / bytes / TokenId.
+Addresses: 0x-str / 20-byte bytes / Address.
+
+### `token_total_supply`
+
+```python
+token_total_supply(token_id: bytes) -> int | None
+```
+
+Query token total supply. ``token_id``: str / bytes / TokenId.
+
+### `token_transfer`
+
+```python
+token_transfer(token_id: bytes, to: bytes, amount: int) -> None
+```
+
+Transfer tokens from caller to recipient. ``token_id``: str / bytes /
+TokenId. ``to``: str / bytes / Address.
+
+### `token_approve`
+
+```python
+token_approve(token_id: bytes, spender: bytes, amount: int) -> None
+```
+
+Approve spender to transfer up to amount. ``token_id``: str / bytes /
+TokenId. ``spender``: str / bytes / Address.
+
+### `token_allowance`
+
+```python
+token_allowance(token_id: bytes, owner: bytes, spender: bytes) -> int | None
+```
+
+Query allowance (owner -> spender). ``token_id``: str / bytes / TokenId.
+Addresses: str / bytes / Address.
+
+### `token_transfer_from`
+
+```python
+token_transfer_from(token_id: bytes, from_addr: bytes, to: bytes, amount: int) -> None
+```
+
+Transfer tokens using allowance. ``token_id``: str / bytes / TokenId.
+Addresses: str / bytes / Address.
+
+### `token_mint`
+
+```python
+token_mint(token_id: bytes, to: bytes, amount: int) -> None
+```
+
+Mint new tokens (requires mint_authority). ``token_id``: str / bytes /
+TokenId. ``to``: str / bytes / Address.
+
+### `token_burn`
+
+```python
+token_burn(token_id: bytes, amount: int) -> None
+```
+
+Burn tokens from caller's balance. ``token_id``: str / bytes / TokenId.
+
+## Cross-actor calls
+
+_Module: `cowboy_sdk.call`_
+
+### `call`
+
+```python
+call(target, method: str, args = None, cycles_limit: int = 100000, *, access_limit: int = None, codec: str = DEFAULT_CODEC)
+```
+
+Synchronously call a method on the target Actor.
+
+Parameters
+----------
+target : bytes | str | Address
+    Target Actor address (20-byte Ethereum address).
+method : str
+    The method name to call.
+args : any, optional
+    Arguments to pass to the method, encoded with ``codec``. Under an
+    encoded codec, ``None`` sends *no payload* (empty bytes) rather than an
+    encoded value, so it is distinct from ``[]`` — which encodes as ``0x80``
+    under ``"cbor"`` and as ``[]`` under ``"json"``. A callee that decodes
+    its payload sees the difference. Under ``"raw"``, ``args`` must be bytes
+    and is sent verbatim (pass ``b""`` for no payload).
+cycles_limit : int
+    Maximum number of Cycles this call may consume, default 100,000.
+access_limit : int, optional
+    Positive structural Access allowance for the nested frame. When
+    omitted, the host grants floor(63/64 of its remaining authority),
+    reserving the balance for the caller to finish.
+codec : str
+    Codec for both the arguments and the return value — one of
+    ``payload_codec.CODECS``, default ``"cbor"``. It must match the
+    ``decode=`` the target handler declares: the codec is chosen by the
+    caller and is not carried on the wire (the ``ExecuteActor`` payload is
+    opaque bytes), so nothing on the callee side can correct a wrong pick.
+    A mismatch usually raises — a ``CodecError`` from the callee's decode,
+    or a decode failure here on the return — but small scalars can
+    misdecode silently, so treat the callee's declared codec as part of its
+    signature.
+
+Returns
+-------
+any
+    The return value of the target method, decoded with ``codec``.
+
+Raises
+------
+ActorNotFoundError
+    The host returned ``NotFound``. Typically no actor is deployed at
+    ``target``, but an existing system actor also returns ``NotFound`` for a
+    resource it cannot find (an unknown subscription id, say), and the two
+    are indistinguishable from the host code alone — so this does not prove
+    the address is empty. At/above ``_CALL_ERROR_SHAPE_ACTIVATION_HEIGHT``
+    the concrete class is ``_ActorNotFoundCallError``, which ``except
+    ActorCallError`` also catches; below it, it does not.
+CallDepthExceeded
+    An in-process (local/checkpoint-mode) call chain overflowed Python's
+    recursion limit. The on-chain 32-frame limit is NOT reported here: the
+    host returns ``Forbidden`` for it — indistinguishable from a permission
+    denial — so an on-chain depth overflow surfaces as ``ActorCallError``.
+ActorCallError
+    The callee raised, or the host rejected the call with any ``Forbidden``
+    cause (depth limit, permission, re-entrancy).
+
+Below the activation height the classification is the pre-unification one:
+failures are sorted by message substring and the legacy message text is
+used. Both are consensus state — see the constant.
+
+### `ActorCallBuilder`
+
+```python
+class ActorCallBuilder
+```
+
+Fluent call builder providing a more ergonomic call() API.
+
+Usage:
+    result = call_builder(target).method("get_price").args(["ETH"]).execute()
+
+### `call_builder`
+
+```python
+call_builder(target) -> ActorCallBuilder
+```
+
+Create an ActorCallBuilder instance.
+
+## Async messages
+
+_Module: `cowboy_sdk.send`_
+
+### `send`
+
+```python
+send(target, payload = None, *, raw: bool = False, codec: str = None) -> None
+```
+
+Send a one-way async message to the target Actor.
+
+The message is delivered asynchronously; the current transaction does not wait
+for the recipient to process the result. Messages cannot be revoked — once send()
+is called, whether the message is delivered depends on the Host implementation,
+even if the current transaction later fails (cycle exhaustion, state conflict, etc.).
+
+Parameters
+----------
+target : bytes | str | Address
+    Target Actor address (20-byte Ethereum address).
+payload : any, optional
+    Data to send, encoded with the selected codec.
+raw : bool
+    If True, payload must be bytes and is sent directly without encoding.
+    Used for low-level message passing with already-encoded payloads. This
+    is the original spelling of ``codec="raw"`` and stays equivalent to it.
+codec : str, optional
+    Codec for the payload — one of ``payload_codec.CODECS``, defaulting to
+    ``"cbor"``. It must match the ``decode=`` the receiving handler declares;
+    as with ``call()``, the choice is the caller's and is not carried on the
+    wire. Passing a codec other than ``"raw"`` together with ``raw=True``
+    raises ``ValueError``.
+
+Raises
+------
+AddressError
+    target is not a valid 20-byte address.
+ValueError
+    codec is not a known codec, or contradicts raw=True.
+TypeError
+    the codec is "raw" (or raw=True) but payload is not bytes.
+
+### `send_raw`
+
+```python
+send_raw(target, payload: bytes) -> None
+```
+
+Send a raw bytes message to the target Actor (without CBOR encoding).
+Used for SDK internal communication (runner jobs, etc.).
+
+## Off-chain runner jobs (LLM / HTTP / MCP)
+
+_Module: `cowboy_sdk.runner`_
+
+### `send_message`
+
+```python
+send_message(job_type: str, cid: bytes, reply_handler: str, args = None, kwargs = None) -> None
+```
+
+Dispatch one compile-time FSM runner step.
+
+This is the trusted Rust transform's active-SDK equivalent of the
+deprecated ``pvm_sdk.runner._send_job`` helper.  Keeping wire construction
+here gives compile-time generated code the same canonical request shape as
+``_RunnerAwaitable.send`` without admitting Python ``compile``/``exec`` to
+the actor interpreter.
+
+### `llm`
+
+```python
+llm(*args, **kwargs) -> _RunnerAwaitable
+```
+
+Create an LLM inference task (for use in await expressions inside @runner.continuation).
+
+### `http`
+
+```python
+http(*args, **kwargs) -> _RunnerAwaitable
+```
+
+Create an HTTP request task (for use in await expressions inside @runner.continuation).
+
+### `agent`
+
+```python
+agent(model: str, query: str, **kwargs) -> _RunnerAwaitable
+```
+
+Create an Agent task: open-source LLM with tool-calling against mounted
+CBFS volumes. The model can call read_file/grep/ls/glob over any volume
+listed in the job's volume_attachments and returns a final answer.
+
+Parameters
+----------
+model : str
+    Model identifier ("kimi-k2", "qwen3-coder", "deepseek-v3",
+    "self-hosted"). Routed to an OpenAI-compatible endpoint at the
+    runner side.
+query : str
+    The question the model is answering.
+system_prompt_path : str, optional
+    Path inside one of the mounted volumes pointing at a system prompt.
+    Resolved at runtime against JobExecutionContext.mount_paths.
+system_prompt_inline : str, optional
+    Inline system prompt; used when system_prompt_path is None.
+session_id : str, optional
+    Stable session id (e.g. sha256(channel:thread)) for conversation
+    continuity across calls. None = stateless.
+session_dir : str, optional
+    Path inside a mounted rw volume where session JSON files are stored
+    (e.g. ".sessions" relative to the volume root).
+max_iterations : int, default 24
+    Maximum agent-loop iterations before truncating with the partial answer.
+max_tool_calls_per_iter : int, default 8
+    Maximum tool calls executed within a single iteration.
+timeout_seconds : int, default 120
+    Hard wall-clock timeout for the whole loop.
+
+Usage:
+    @runner.continuation
+    async def slack_event(self, msg):
+        ctx = capture()
+        ctx.answer = await runner.agent(
+            "kimi-k2",
+            msg["text"],
+            system_prompt_path="cowbot/system_prompt.txt",
+            session_id=msg["thread_key"],
+            session_dir=".sessions",
+        )
+        return ctx.answer
+
+### `mcp`
+
+```python
+mcp(server: str, tool: str, *args, **kwargs) -> _RunnerAwaitable
+```
+
+Create an MCP (Model Context Protocol) tool call task.
+
+Parameters
+----------
+server : str
+    MCP server identifier (e.g., "filesystem", "github").
+tool : str
+    Name of the tool to call.
+*args, **kwargs
+    Arguments to pass to the tool.
+
+Usage:
+    @runner.continuation
+    async def analyze(self, msg):
+        ctx = capture()
+        ctx.files = await runner.mcp("filesystem", "read_file", path="/data/input.txt")
+        ctx.analysis = await runner.llm(f"Analyze this: {ctx.files.text}")
+        return ctx.analysis
+
+### `container`
+
+```python
+container(image, command, resource_tier = None, min_isolation_tier = None, volumes = None, **kwargs) -> _RunnerAwaitable
+```
+
+CIP-10: run arbitrary/deterministic code in a sandboxed container on a
+runner, with the job's CBFS volumes FUSE-mounted inside at
+/mnt/volumes/{name}/. The container runs headless (no network egress in
+Phase A); its stdout, exit code, and the selected isolation tier come back
+in the result.
+
+Parameters
+----------
+image : str
+    A pinned protocol base image key ("runner-base", "runner-python") or
+    a 64-hex registered image digest, which the runner fetches by its
+    on-chain CBFS locator, verifies and caches (CIP-10 Part II §15).
+command : list[str]
+    Entrypoint argv run inside the sandbox, e.g.
+    ["python3", "/mnt/volumes/code/main.py"]. User code is passed as data
+    (task payload and/or a mounted volume) — never baked into an image.
+resource_tier : str, optional
+    Fixed resource tier: "small" (default) or "medium".
+min_isolation_tier : str, optional
+    Minimum isolation the runner must provide: "standard" (default,
+    hardened rootless runc) or "strong" (gVisor/microVM). Public or
+    adversarial code must require "strong".
+volumes : list, optional
+    CIP-9 volumes to attach, each either a name string (read-only) or a
+    (name, mode) pair with mode "ro"/"rw"/"wo". Mounted at
+    /mnt/volumes/{name}/.
+
+Usage:
+    @runner.continuation
+    async def save_doc(self, msg):
+        ctx = capture()
+        ctx.result = await runner.container(
+            "runner-python",
+            ["python3", "-c", "open('/mnt/volumes/ws/docs/x.md','w').write(BODY)"],
+            volumes=[("ws", "rw")],
+        )
+        return self._finalize(ctx.result)
+
+### `extract_text`
+
+```python
+extract_text(result) -> str
+```
+
+Canonical text of a runner result.
+
+For a mapping, the first present of ``content`` / ``text`` / ``response`` /
+``data`` / ``answer`` (recursing when that value is itself a mapping);
+bytes are UTF-8 decoded; ``None`` is ``""``; anything else is ``str()``.
+
+Matching is on key *presence*, not on a non-null value: a payload whose
+first matching key holds ``None`` yields ``""``.
+
+### `RunnerResult`
+
+```python
+class RunnerResult
+```
+
+The value an ``await runner.<job>()`` yields inside a continuation.
+
+Wraps the decoded ``result`` field of the reply:
+  - ``.raw``    — the decoded result exactly as received (dict / str / ...).
+  - ``.data``   — alias of ``.raw``.
+  - ``.text``   — the canonical text (see ``extract_text``).
+  - ``.json()`` — ``.text`` parsed as JSON.
+
+NOT a ``dict``, even when ``.raw`` is one: ``isinstance(result, dict)`` is
+False here. Reach for ``.text`` (canonical reply) or ``.data`` (the raw
+decoded result, which is not always a mapping) rather than type-checking
+the wrapper.
+
+An ephemeral view: it encodes as ``.raw`` (``__cbor_reduce__``), so a value
+persisted in ``ctx`` across an await comes back as its ``.raw`` next resume —
+extract what you need before awaiting again.
+
+### `handle_runner_result`
+
+```python
+handle_runner_result(self, msg) -> None
+```
+
+Generic Runner result handler.
+Routes the result to the correct __resume method based on the reply_handler field in the message.
+
+Can be used in an @actor class:
+    @actor
+    class MyActor:
+        def on_runner_result(self, msg):
+            runner.handle_runner_result(self, msg)
+
+### `dispatch`
+
+```python
+dispatch(awaitable, cid: bytes, reply_handler: str) -> None
+```
+
+Dispatch one compile-time FSM step whose callee was awaited by name.
+
+``await runner.<job>(...)`` names its job type in the source, so the trusted
+transform builds the request itself via ``send_message``. ``await
+research(...)`` cannot: ``research`` is the author's own callable, so the
+transform emits the call verbatim and hands its result here.
+
+Requiring a ``_RunnerAwaitable`` is the point. Awaiting a function that
+returns an ordinary value has to fail on the initial leg, loudly, rather
+than saving a continuation checkpoint no runner reply will ever resume.
+
+The wire payload is ``_RunnerAwaitable.send``'s, which is byte-for-byte what
+``send_message`` builds.
+
+### `decode_reply`
+
+```python
+decode_reply(fn, raw)
+```
+
+Bind one FSM reply to the value the awaited callable promises.
+
+An off-chain proxy owns its own result frame, so it carries a
+``__cowboy_decode__`` that validates and types the reply. Anything without
+one keeps the ``RunnerResult`` wrapper, which is what every
+``runner.<job>(...)`` await has always yielded.
+
+A present-but-not-callable ``__cowboy_decode__`` is refused rather than
+ignored: silently falling back to ``RunnerResult`` would hand the actor an
+undecoded reply under a name that promised a typed one, and the mistake
+would surface as a confusing attribute error somewhere downstream.
+
+### `cowchat_room`
+
+```python
+cowchat_room(model, service_id, room_owner, room_id, message_id, member_key_account, member_key_version = 1, **kwargs)
+```
+
+Create a CowchatRoom task: the assigned runner answers one addressed
+Cowchat room message with this actor's member key. The job result is only
+a content-free receipt (room id, message id, status); no room text ever
+reaches the chain.
+
+Parameters
+----------
+model : str
+    Model identifier routed to the runner's OpenAI-compatible endpoint.
+service_id : bytes
+    32-byte hosted Cowchat service id.
+room_owner : bytes
+    20-byte address of the room's owner.
+room_id, message_id : str
+    The addressed message, as delivered by the room's wake.
+member_key_account : str
+    0x account owning the CBSS secret
+    ``COWCHAT_MEMBER_KEY_V1_<THIS ACTOR ADDRESS HEX>`` (granted to this actor).
+member_key_version : int, default 1
+    CBSS version of that secret.
+
+## Event hooks (emit / on_event)
+
+_Module: `cowboy_sdk.events`_
+
+### `emit`
+
+```python
+emit(topic)
+```
+
+Wrap a function so its return value is fed to runtime.emit_event.
+
+The original return value is passed through to the caller. If the function
+raises, no emit happens (the exception propagates as usual).
+
+The return value is handed to ``runtime.emit_event`` unchanged, so it carries
+that function's encoding contract: bytes-like passes through as the raw
+hatch, anything else is canonical CBOR.
+
+Example:
+    @emit("price_update")
+    def update(self, payload):
+        return {"price": 42}
+    # After update() returns, runtime.emit_event fires with the CBOR
+    # encoding of {"price": 42} — b'\xa1eprice\x18*'.
+
+### `on_event`
+
+```python
+on_event(emitter, topic, gas, bid = 0)
+```
+
+Mark a method as a CIP-29 subscription handler.
+
+Sets `method._cip29_subscription = (emitter, topic_bytes, gas, bid)`.
+The @actor class decorator (cowboy_sdk.actor) reads this attribute and
+auto-calls runtime.subscribe_event from a wrapped init handler.
+
+Inputs:
+    emitter: emitter actor address (0x-hex str / 20-byte bytes / Address);
+        matches runtime.subscribe_event.
+    topic: str | bytes, normalized to bytes for the protocol layer
+    gas: int >= MIN_SUBSCRIPTION_GAS_PREPAID (50_000) — prepaid fire budget
+    bid: int >= 0 — bid for sync-fire slot ordering (default 0)
+
+Raises:
+    ValueError if emitter is not a 20-byte address
+    TypeError if topic, gas, or bid has the wrong type
+
+Example:
+    @on_event(emitter=b"\x01"*20, topic="liquidation_imminent",
+              gas=500_000, bid=100_000)
+    def on_liquidation(self, payload):
+        self.bid_for_collateral(payload)
+
+## Streams
+
+_Module: `cowboy_sdk.stream`_
+
+### `derive_content_key`
+
+```python
+derive_content_key(stream_secret: bytes, chain_id: int, stream_id: bytes, key_epoch: int) -> bytes
+```
+
+Derive the CIP-7 per-epoch content key with HKDF-SHA256.
+
+### `default_committee_selector`
+
+```python
+default_committee_selector() -> bytes
+```
+
+Return the Rust `CommitteeSelector::Default` AAD bytes.
+
+### `override_committee_selector`
+
+```python
+override_committee_selector(selector_hash: bytes) -> bytes
+```
+
+Return `CommitteeSelector::Override(hash)` AAD bytes.
+
+### `wrapped_dek_aad`
+
+```python
+wrapped_dek_aad(chain_id: int, stream_id: bytes, key_epoch: int, generation: int, committee_epoch: int, committee_selector: bytes | str | None = None, release_key_material_hash: bytes | None = None) -> bytes
+```
+
+Build the AAD bound to a CIP-7 WrappedDek.
+
+Layout (COW-2924, 116 + len(stream_id) - 4 bytes; 116 for a 4-byte stream_id):
+  b"cip-7-wd-v1"
+  || u64_be(chain_id)
+  || u32_be(len(stream_id))
+  || stream_id
+  || u64_be(key_epoch)
+  || u64_be(generation)
+  || u64_be(committee_epoch)
+  || committee_selector_aad_bytes            # tag(1) || selector_hash(32)
+  || release_key_material_hash(32)           # COW-2924 — appended
+
+``release_key_material_hash`` is the 32-byte account-release-key material
+hash (covers mpk_g2 + committee/threshold/vss). It is REQUIRED: the chain's
+stream-key manager recomputes it from committed state and byte-rejects a
+wrapped DEK bound to a substituted key. This MUST match the kernel builder
+``cowboy_protocol_cbss_crypto::Cip7ContentKeyAad`` and node
+``ras::cip7_wrapped_dek_aad`` byte-for-byte (see the shared corpus
+``testdata/cip7_wrapped_dek_aad_vectors.json``).
+
+### `encrypt`
+
+```python
+encrypt(content_key: bytes, plaintext: bytes, aad: bytes) -> bytes
+```
+
+Encrypt as nonce(24) || ciphertext || tag(16) with a fresh random nonce.
+
+Safe default for OFF-CHAIN tooling: the nonce is generated here so it can
+never be reused. Not usable under deterministic/on-chain execution (``os``
+is banned) — use :func:`encrypt_with_nonce` there.
+
+### `encrypt_with_nonce`
+
+```python
+encrypt_with_nonce(content_key: bytes, plaintext: bytes, aad: bytes, nonce: bytes) -> bytes
+```
+
+Encrypt with an explicit caller-supplied nonce (deterministic / on-chain).
+
+WARNING — nonce reuse is catastrophic. XChaCha20-Poly1305 security REQUIRES
+that a ``(content_key, nonce)`` pair is NEVER reused: reuse leaks plaintext
+(XOR of messages) and breaks integrity. The nonce MUST NOT be user-
+controlled — derive it from a unique, monotonic source (e.g. tx hash ‖
+sequence number). Off-chain, prefer :func:`encrypt`, which generates a
+fresh random nonce for you.
+
+### `decrypt`
+
+```python
+decrypt(content_key: bytes, ciphertext_envelope: bytes, aad: bytes) -> bytes
+```
+
+Decrypt nonce(24) || ciphertext || tag(16).
+
+### `signing_aad`
+
+```python
+signing_aad(stream_id: bytes, sequence: int, key_epoch: int, kind: str, content_type: str) -> bytes
+```
+
+Canonical CBOR AAD for encrypted StreamMessage payloads.
+
+### `generate_x25519_keypair`
+
+```python
+generate_x25519_keypair() -> tuple[bytes, bytes]
+```
+
+Generate a fresh X25519 keypair as (private_key, public_key).
+
+### `Stream`
+
+```python
+class Stream
+```
+
+### `acquire_epoch_access`
+
+```python
+acquire_epoch_access(params)
+```
+
+### `acquire_access`
+
+```python
+acquire_access(params)
+```
+
+### `register_account_key`
+
+```python
+register_account_key(params)
+```
+
+### `StreamConsumerDedup`
+
+```python
+class StreamConsumerDedup
+```
+
+Consumer-side dedup for CIP-7's at-least-once push contract (COW-1512).
+
+Stream push delivery is **at-least-once**: a consumer may receive the same
+``(stream_id, sequence)`` more than once — e.g. a publisher/runner retry, or
+a reconnect whose backfill overlaps already-pushed messages. Consumers MUST
+therefore dedup by ``(stream_id, sequence)`` and process each pair exactly
+once. Sequences are monotonic and gap-free per stream, but redelivery and
+out-of-order arrival (live push racing a backfill fetch) are both possible.
+
+Memory is bounded by a sliding window per stream: a contiguous ``floor``
+(every sequence ``<= floor`` has been delivered) plus a set of out-of-order
+sequences seen above it, which compacts into the floor as the gaps fill — so
+steady contiguous delivery keeps only the floor, not every sequence ever
+seen.
+
+## Watchtower
+
+_Module: `cowboy_sdk.watchtower`_
+
+### `WatchtowerClient`
+
+```python
+class WatchtowerClient
+```
+
+Client for a single Watchtower feed actor at ``feed``.
+
+## Deterministic codec (CBOR)
+
+_Module: `cowboy_sdk.codec`_
+
+### `encode`
+
+```python
+encode(value: object) -> bytes
+```
+
+Encode a Python value into a Canonical CBOR byte sequence.
+
+### `decode`
+
+```python
+decode(data: bytes)
+```
+
+Decode a Canonical CBOR byte sequence into a Python value.
+
+## Payload codecs — the handler/caller selector
+
+_Module: `cowboy_sdk.payload_codec`_
+
+### `normalize_codec`
+
+```python
+normalize_codec(fmt)
+```
+
+Validate a caller-side ``codec=`` argument, failing loud on an unknown one.
+
+### `ok`
+
+```python
+ok(value)
+```
+
+Force ``value`` through the declaring handler's codec on return.
+
+A bare ``bytes``/``None`` return from a ``decode=`` handler passes through
+verbatim (bytes are treated as an already-serialized payload; None as "no
+output"). Wrap the value in ``ok`` when you instead want it encoded as a
+codec value — e.g. a CBOR byte string::
+
+    @public(decode="cbor")
+    def blob(self, payload):
+        return ok(b"\x00\x01")   # -> CBOR byte string, not raw passthrough
+
+``ok`` is only meaningful inside a handler declaring an encoded codec
+(``"cbor"`` / ``"json"``); a raw handler's return is never re-encoded, so an
+``ok`` value there is a bug the permission wrapper raises ``TypeError`` for.
+
+### `decode_payload`
+
+```python
+decode_payload(payload, fmt)
+```
+
+Decode a raw inbound handler payload using the named codec.
+
+``fmt`` is one of ``"raw"``, ``"cbor"`` or ``"json"``:
+
+  * ``"raw"``  — return ``payload`` unchanged (the pre-decode contract:
+    handlers receive the exact bytes the host delivered; no type check).
+  * ``"cbor"`` — canonical CBOR decode (invariant I-1).
+  * ``"json"`` — the strict JSON decode ``json_codec`` owns: UTF-8 only, no
+    non-finite numbers, no surrogate escapes.
+
+Both encoded codecs require a bytes-like payload; a non-bytes payload or any
+decode failure (malformed bytes, over-nesting) raises ``CodecError`` (host
+slug E1213).
+
+An empty payload (no argument bytes) decodes to ``None`` for both encoded
+codecs — symmetric with the return side, where ``None`` means "no output"
+(``codec.decode(b"")`` / ``json_codec.decode(b"")`` would otherwise raise).
+``raw`` returns the empty bytes unchanged.
+
+### `encode_args`
+
+```python
+encode_args(value, fmt)
+```
+
+Encode caller arguments into the payload bytes the handler receives.
+
+Mirror of ``decode_payload``: for a handler declared ``decode=fmt``,
+``decode_payload(encode_args(v, fmt), fmt)`` is ``v``.
+
+  * ``"raw"``  — ``value`` must be ``bytes``/``bytearray`` and is sent
+    verbatim; anything else (``None`` included) raises ``TypeError``. The
+    accepted set is the one ``send(raw=True)`` has always taken, whose hatch
+    this generalizes.
+  * ``"cbor"`` / ``"json"`` — ``None`` sends *no payload* (empty bytes),
+    which a callee can tell apart from an encoded value; everything else is
+    encoded, canonically for ``cbor`` and under the strict profile for
+    ``json``.
+
+A ``cbor`` encode failure propagates as the stdlib error ``codec.encode``
+raised. It is deliberately not re-classified the way ``_encode_value``
+re-classifies a handler return: this runs in the caller's own frame, where
+the exception is the caller's to catch, not a fault the host has to slug.
+``json`` still raises ``CodecError`` — its strict profile classifies its own
+refusals, and a ``CowboyError`` is no harder for a caller to catch.
+
+### `decode_return`
+
+```python
+decode_return(result, fmt)
+```
+
+Decode a handler's return, using the codec the call was made with.
+
+Mirror of ``_encode_return``. ``None`` — the host's "no output" — stays
+``None`` under every codec; ``"cbor"`` and ``"json"`` run their decoder;
+``"raw"`` hands back exactly what the host returned, the same untouched
+contract ``decode_payload`` gives a raw handler inbound. Not
+``bytes(result)``: that would turn a local harness's non-bytes reply into
+that many zero bytes.
+
+An encoded handler that returns bare ``bytes`` passes them through
+unencoded, so decoding those raises here unless the handler wrapped them in
+``ok()``. That asymmetry is what ``ok`` exists to resolve, and it is the same
+one a caller sees today; it is not introduced by the codec selector.
+
+## Strict JSON codec
+
+_Module: `cowboy_sdk.json_codec`_
+
+### `encode`
+
+```python
+encode(value) -> bytes
+```
+
+Serialize ``value`` as strict canonical JSON, UTF-8 encoded.
+
+Raises ``CodecError`` (E1213) for a value JSON cannot represent: a
+non-finite float, an unserializable type, or nesting deep enough to
+overflow the recursion limit. Classifying them together matches
+``payload_codec._encode_value``, so a serialization fault reaches the host
+as a codec fault rather than ``HostError::Internal``.
+
+### `decode`
+
+```python
+decode(data: bytes)
+```
+
+Parse strict JSON bytes into a native value — the mirror of ``encode``.
+
+The invariant is on the *value*, not on the bytes: whatever this returns,
+``encode`` can serialize again, so a handler may pass its payload straight
+back out. Input spelling is deliberately unconstrained — ordinary RFC 8259
+that no encoder here would emit (whitespace, unsorted keys, duplicate keys
+with last-wins, literal non-ASCII) is accepted and normalized on the way
+back out. Demanding canonical input instead would reject what every stock
+JSON encoder produces, which is the interop this codec exists for.
+
+Refused is what would break that invariant:
+
+  * UTF-8 only. ``json.loads`` on raw bytes sniffs for a UTF-16/32 BOM and
+    would reinterpret the payload under an encoding nothing here emits.
+  * no non-finite floats, spelled either as one of the bare tokens or
+    through number syntax that overflows.
+  * no surrogates (``_reject_surrogates``).
+
+Raises ``CodecError`` (E1213) for each of those and for malformed JSON,
+matching ``encode`` and ``codec.decode``.
+
+## Errors
+
+_Module: `cowboy_sdk.errors`_
+
+### `CowboyError`
+
+```python
+class CowboyError
+```
+
+Base class for all cowboy_sdk exceptions.
+
+### `DeterminismError`
+
+```python
+class DeterminismError
+```
+
+An operation was used that would break cross-node determinism.
+
+### `StateConflictError`
+
+```python
+class StateConflictError
+```
+
+A guard-monitored storage key changed while the Continuation was suspended.
+
+### `ReentrancyError`
+
+```python
+class ReentrancyError
+```
+
+The same method was called reentrantly before the lock was released.
+
+### `LoopBoundExceeded`
+
+```python
+class LoopBoundExceeded
+```
+
+A loop decorated with @bounded_loop exceeded the maximum iteration count.
+
+### `CaptureTypeError`
+
+```python
+class CaptureTypeError
+```
+
+Non-serializable type stored in a capture() context.
+
+### `UncarriedNameError`
+
+```python
+class UncarriedNameError
+```
+
+A local the implicit continuation could not carry across an await.
+
+### `ContinuationLimitError`
+
+```python
+class ContinuationLimitError
+```
+
+A Continuation constraint was violated (too many awaits, nested await, etc.).
+
+### `ContinuationNotFoundError`
+
+```python
+class ContinuationNotFoundError
+```
+
+The requested Continuation state does not exist.
+
+### `ContinuationCorruptedError`
+
+```python
+class ContinuationCorruptedError
+```
+
+Continuation state data could not be decoded or failed integrity verification.
+
+### `ContinuationSizeLimitError`
+
+```python
+class ContinuationSizeLimitError
+```
+
+A single Continuation exceeded the 64 KiB limit.
+
+### `ContinuationCountLimitError`
+
+```python
+class ContinuationCountLimitError
+```
+
+The Actor's active Continuation count exceeded the limit of 100.
+
+### `CycleLimitExceeded`
+
+```python
+class CycleLimitExceeded
+```
+
+Execution exceeded the allocated Cycle (compute) quota.
+
+### `CallDepthExceeded`
+
+```python
+class CallDepthExceeded
+```
+
+A local (in-process) call chain overflowed Python's recursion limit.
+
+The on-chain 32-frame cap does not arrive here. The host rejects it with
+``Forbidden``, whose wire form is identical to a permission denial and a
+re-entrancy reject, so ``call()`` cannot tell the three apart and surfaces
+all of them as :class:`ActorCallError`. ``HOST_ERROR_CODE`` records the code
+this failure belongs to, not one that maps back to this class — several
+classes here share code 5.
+
+### `RunnerTimeoutError`
+
+```python
+class RunnerTimeoutError
+```
+
+The Continuation's timeout_blocks has expired.
+
+### `RunnerValidationError`
+
+```python
+class RunnerValidationError
+```
+
+The result returned by the Runner did not pass the validation checker.
+
+### `DeterministicValidationError`
+
+```python
+class DeterministicValidationError
+```
+
+Multiple Runners' execution results could not reach consensus.
+
+### `CodecError`
+
+```python
+class CodecError
+```
+
+Payload encoding or decoding failed.
+
+### `AddressError`
+
+```python
+class AddressError
+```
+
+Address format error (not a 20-byte Ethereum address).
+
+### `TokenIdError`
+
+```python
+class TokenIdError
+```
+
+Token id format error (not a 32-byte CIP-20 token id).
+
+### `ActorNotFoundError`
+
+```python
+class ActorNotFoundError
+```
+
+The target Actor address does not exist.
+
+### `ActorCallError`
+
+```python
+class ActorCallError
+```
+
+Actor synchronous call failed (callee raised an exception).
+
+### `PurityViolationError`
+
+```python
+class PurityViolationError
+```
+
+Async side effect called inside a @pure handler.
+
+### `PermissionDeniedError`
+
+```python
+class PermissionDeniedError
+```
+
+A cross-actor call targeted a handler the caller is not authorized to invoke.
+

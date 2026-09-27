@@ -1,0 +1,44 @@
+---
+title: "E1411 — Transfer hook exceeded gas cap"
+description: "Transfer hook exceeded gas cap"
+---
+
+# E1411 — Transfer hook exceeded gas cap
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1411` |
+| **Slug** | `E1411` |
+| **Category** | `gas` (Gas) |
+| **CIP** | CIP-20 §8.3 |
+
+## What happened
+
+Transfer hook exceeded gas cap.
+
+## Why it happened
+
+The transfer hook consumed more than the 50,000-cycle cap defined in CIP-20 §8.3.
+
+## How to fix
+
+Simplify hook logic to stay under the 50,000-cycle cap.
+
+## Receipt example
+
+```json
+{
+  "code": 1411,
+  "slug": "E1411",
+  "category": "gas",
+  "what": "Transfer hook exceeded gas cap",
+  "fix": "Simplify hook logic to stay under the 50,000-cycle cap.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1411"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

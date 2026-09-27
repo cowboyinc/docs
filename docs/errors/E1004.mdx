@@ -1,0 +1,44 @@
+---
+title: "E1004 — Insufficient balance for gas"
+description: "Insufficient balance for gas"
+---
+
+# E1004 — Insufficient balance for gas
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1004` |
+| **Slug** | `E1004` |
+| **Category** | `gas` (Gas) |
+
+
+## What happened
+
+Insufficient balance for gas.
+
+## Why it happened
+
+The sender's balance cannot cover the maximum gas cost (gas_limit × max_fee).
+
+## How to fix
+
+Top up the sender's balance or lower `gas_limit` / `max_fee_per_*` fields.
+
+## Receipt example
+
+```json
+{
+  "code": 1004,
+  "slug": "E1004",
+  "category": "gas",
+  "what": "Insufficient balance for gas",
+  "fix": "Top up the sender's balance or lower `gas_limit` / `max_fee_per_*` fields.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1004"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

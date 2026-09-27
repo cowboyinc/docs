@@ -1,0 +1,111 @@
+---
+title: SDK Overview
+description: The cowboy_sdk Python library for writing actors (CIP-6)
+icon: code
+---
+
+## Overview
+
+The **`cowboy_sdk`** is a Python library that provides the canonical developer experience for writing Cowboy actors. On deployed actors, `sys.path` already includes it — you can `import cowboy_sdk` directly. In a full source workspace, the implementation lives with the PVM source.
+
+<Note>
+  The SDK is specified by **[CIP-6](/cips/cip-6-sdk)**. APIs may still evolve; see the CIP for the authoritative surface.
+</Note>
+
+## What the SDK Gives You
+
+| Feature | Module | Purpose |
+|---------|--------|---------|
+| `@actor` decorator | `cowboy_sdk.actor` | Injects `self.storage`, `self.address`, and wires CBOR auto-serialization |
+| `runner.continuation` FSM | `cowboy_sdk.runner` | Pause an actor mid-handler while a runner job is in flight; resume on callback |
+| `CowboyModel` | `cowboy_sdk.models` | Typed, CBOR-serializable structured data |
+| `capture()` | `cowboy_sdk.continuation` | Explicitly declare variables preserved across `await` |
+| `codec` | `cowboy_sdk.codec` | CBOR encode/decode with deterministic ordering |
+| `runtime` | `cowboy_sdk.runtime` | Access to block context, gas, events, logging |
+| `SoftFloat` | `cowboy_sdk.types` | Deterministic floating-point type |
+| `mock_host` | `cowboy_sdk.mock_host` | Stub the PVM host for unit tests off-chain |
+
+## Two Ways to Write an Actor
+
+**Low-level (host API):** import `pvm_host` and manage bytes serialization yourself. Used by `actors/feed-subscriber/main.py`.
+
+```python
+import pvm_host
+
+def increment(payload):
+    val = pvm_host.get_state(b"counter") or b"\x00" * 8
+    n = int.from_bytes(val, "big") + 1
+    pvm_host.set_state(b"counter", n.to_bytes(8, "big"))
+    return n
+```
+
+**Recommended — CIP-6 SDK:**
+
+```python
+from cowboy_sdk import actor, public, runner, capture, CowboyModel
+
+class ChatEntry(CowboyModel):
+    id: int
+    sender: str
+    message: str
+
+@actor
+class Counter:
+    @public(decode="raw")
+    def init(self, payload):
+        self.storage["count"] = 0
+        return b"ok"
+
+    @public(decode="cbor")
+    def increment(self, payload):
+        self.storage["count"] = (self.storage.get("count") or 0) + 1
+        return self.storage["count"]
+```
+
+The `@actor` decorator auto-CBOR-encodes values written to `self.storage`, injects `self.address`, and registers handlers with the PVM. Handlers take a `payload` argument, are deny-by-default (`@public` opens them), and one-time setup belongs in the `init` handler (invoked at deploy) — not in `__init__`, which runs on every dispatch. `CowboyModel` fields are schema-checked and serialize deterministically.
+
+## Continuation FSM for Off-Chain Jobs
+
+Calling a runner (LLM/HTTP/MCP) is asynchronous — the result arrives in a later block as a callback transaction. The SDK compiles `@runner.continuation` methods into a synchronous state machine under the hood so you can write code that *looks* sequential:
+
+```python
+from cowboy_sdk import actor, runner, capture
+
+@actor
+class Chat:
+    @runner.continuation
+    async def chat(self, msg):
+        ctx = capture()      # declare what survives across the await
+        ctx.msg = msg
+        result = await runner.llm(msg)
+        self.storage[f"reply:{ctx.msg}"] = str(result)
+        return b"ok"
+```
+
+The compiler splits the method at each `await`, persists captured variables, and resumes on the callback. See CIP-6 §10 for the full rule set (await point limits, non-reversible `send`, etc.).
+
+## Unit Testing
+
+Use `cowboy_sdk.testing.SimulatedChain` (an in-memory harness over `cowboy_sdk.mock_host`) to run actors under pytest without a live chain:
+
+```python
+from cowboy_sdk.testing import SimulatedChain
+
+import my_actor
+
+def test_increment():
+    chain = SimulatedChain(my_actor.Counter())
+    chain.call("init")
+    chain.call("increment")
+    chain.call("increment")
+    chain.assert_state("count", b"\x02")  # raw stored bytes (CBOR-encoded 2)
+```
+
+## Where to Find More
+
+- **Source**: the PVM's `cowboy_sdk` package in a full Cowboy source workspace
+- **Spec**: [CIP-6](/cips/cip-6-sdk) — normative API
+- **Examples**: [Examples Curriculum](/developers/examples) — source-checkout demos and end-to-end actors
+- **Actor anatomy**: [Minimal Actor](/architecture/actor-vm/minimal-actor)
+- **Transaction format**: [tx-format](/developers/tx-format)
+- **Best practices**: [best-practices](/developers/best-practices)

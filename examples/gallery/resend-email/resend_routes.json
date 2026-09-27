@@ -1,0 +1,35 @@
+{
+  "source": "https://raw.githubusercontent.com/resend/resend-openapi/main/resend.yaml",
+  "spec_version": "1.5.1",
+  "endpoint": "https://api.resend.com/emails",
+  "method": "POST",
+  "operation_id": "emails/send",
+  "auth": {"in": "header", "name": "Authorization", "secret": "RESEND_API_KEY", "scheme": "Bearer"},
+  "idempotency": {"header": "Idempotency-Key", "max_length": 256},
+  "required_request": ["from", "to", "subject"],
+  "optional_request": ["html", "text", "cc", "bcc", "reply_to"],
+  "recipient_fields": ["to", "cc", "bcc", "reply_to"],
+  "to_max_items": 50,
+  "wrapper_inputs": [
+    "hire_id",
+    "from",
+    "to",
+    "subject",
+    "html",
+    "text",
+    "cc",
+    "bcc",
+    "reply_to"
+  ],
+  "success_response": ["id"],
+  "bounds": {
+    "max_address_chars": 320,
+    "max_recipients": 50,
+    "max_total_recipients": 50,
+    "max_subject_chars": 1000,
+    "max_body_chars": 24000,
+    "max_request_bytes": 32000,
+    "runner_result_bytes": 65536,
+    "result_bytes": 38000
+  }
+}

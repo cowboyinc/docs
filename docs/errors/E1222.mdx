@@ -1,0 +1,44 @@
+---
+title: "E1222 — Target account does not exist"
+description: "Target account does not exist"
+---
+
+# E1222 — Target account does not exist
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1222` |
+| **Slug** | `E1222` |
+| **Category** | `runtime` (Runtime) |
+
+
+## What happened
+
+Target account does not exist.
+
+## Why it happened
+
+The referenced account has not been created on-chain.
+
+## How to fix
+
+Create or fund the account before referencing it.
+
+## Receipt example
+
+```json
+{
+  "code": 1222,
+  "slug": "E1222",
+  "category": "runtime",
+  "what": "Target account does not exist",
+  "fix": "Create or fund the account before referencing it.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1222"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

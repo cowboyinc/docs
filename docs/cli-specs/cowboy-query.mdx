@@ -1,0 +1,73 @@
+---
+title: "cowboy query"
+description: Query blocks and transactions in bulk on the Cowboy blockchain
+icon: magnifying-glass
+---
+
+## Synopsis
+
+```bash
+cowboy query blocks --start <n> [--end <n>] [--limit <n>]
+cowboy query transactions [--address <address>] [--limit <n>]
+```
+
+## Subcommands
+
+### `cowboy query blocks`
+
+Query a range of blocks.
+
+**Behavior:**
+
+1. Fetch blocks from `--start` height up to `--end` height (or `--limit` blocks).
+2. Print a summary of each block.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--start` | Required | Starting block height |
+| `--end` | None | Ending block height (optional) |
+| `--limit` | `10` | Maximum number of blocks to return |
+
+**Example:**
+
+```bash
+$ cowboy query blocks --start 100 --limit 3
+Block #100  Hash: 0xaaa...  Txs: 2
+Block #101  Hash: 0xbbb...  Txs: 0
+Block #102  Hash: 0xccc...  Txs: 1
+```
+
+---
+
+### `cowboy query transactions`
+
+Query transactions, optionally filtered by address.
+
+**Behavior:**
+
+1. Fetch transactions from the chain.
+2. If `--address` is provided, filter to transactions involving that address (sender or recipient).
+3. Print a summary of each transaction.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--address` | None | Filter by account address (hex) |
+| `--limit` | `10` | Maximum number of transactions to return |
+
+**Example:**
+
+```bash
+$ cowboy query transactions --address 0x7a3B...F92E --limit 5
+0xabc...  Transfer  100 CBY -> 0x1a2B...  Block #142
+0xdef...  Deploy    actors/counter         Block #140
+0x123...  Execute   0xdef456.increment()   Block #138
+```
+
+## Edge Cases
+
+- If no transactions match the filter, print an empty result (not an error).
+- All subcommands are read-only and do not require a private key.

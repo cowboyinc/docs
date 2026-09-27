@@ -1,0 +1,392 @@
+---
+title: FAQ
+description: Common questions about Cowboy answered
+icon: "users"
+---
+
+## General Questions
+
+<AccordionGroup>
+  <Accordion title="What is Cowboy?" icon="circle-question">
+    Cowboy is a Layer 1 blockchain designed for **autonomous agents** and **verifiable off-chain computation**. It features:
+
+    - **Python-based actors** (smart contracts) instead of Solidity
+    - **Dual-metered gas system** (Cycles for compute, Cells for data)
+    - **Native timers** for autonomous execution
+    - **Verifiable off-chain compute** via a runner network (LLM, HTTP, MCP)
+    - **CBFS** — encrypted distributed storage with FUSE mount
+    - **Ethereum-compatible keys** — the same secp256k1 addresses work on both chains
+
+    Think of it as "Ethereum but optimized for AI agents, complex computation, and large data."
+  </Accordion>
+  
+  <Accordion title="Why Python instead of Solidity?" icon="python">
+    **Advantages of Python**:
+    
+    ✅ **Familiar**: 80%+ of AI/ML developers already know Python
+    ✅ **Expressive**: Cleaner, more readable code
+    ✅ **Ecosystem**: Direct access to data structures, algorithms
+    ✅ **AI-Ready**: Natural fit for AI agent logic
+    
+    **How we make it work**:
+    - Deterministic Python VM (no system calls, no I/O)
+    - Software floating-point for consensus
+    - Strict module whitelist
+    - Comprehensive gas metering
+    
+    See [Actor VM & Determinism](/architecture/actor-vm/determinism-and-sandbox) for details.
+  </Accordion>
+  
+  <Accordion title="What are Actors?" icon="user">
+    **Actors** are Cowboy's equivalent of smart contracts. Key differences:
+    
+    | Concept | Ethereum | Cowboy |
+    |---------|----------|--------|
+    | **Contract** | Solidity contract | Python Actor |
+    | **Function** | External function | Handler method |
+    | **State** | Storage variables | `storage` API |
+    | **Call** | Transaction | Message |
+    | **Address** | 0x... | 0x... |
+    
+    **Example** (using the CIP-6 SDK):
+    ```python
+    from cowboy_sdk import actor
+
+    @actor
+    class MyActor:
+        def my_handler(self, param):
+            value = self.storage.get("key", 0)
+            self.storage["key"] = value + param
+            return value
+    ```
+  </Accordion>
+  
+  <Accordion title="Is Cowboy EVM-compatible?" icon="ethereum">
+    **Not at the VM level, but keys are compatible.**
+
+    ❌ **VM / contracts are not compatible**:
+    - Different VM (Python-based PVM instead of EVM)
+    - Different transaction format
+    - Different gas model (Cycles + Cells vs. single gas)
+
+    ✅ **Keys and addresses are compatible**:
+    - Same secp256k1 curve
+    - Same 20-byte address derivation
+    - An existing Ethereum key works unchanged — same address, same signing flow
+
+    **Migration path for contracts**: Solidity contracts need to be rewritten in Python, but the business logic ports naturally. Wallet tooling usually works as-is.
+  </Accordion>
+  
+  <Accordion title="What's the difference between Cowboy and Ethereum?" icon="scale-balanced">
+    | Feature | Ethereum | Cowboy |
+    |---------|----------|--------|
+    | **Language** | Solidity | Python |
+    | **VM** | EVM | Python VM |
+    | **Gas Model** | Single gas | Cycles + Cells |
+    | **Timers** | No (need Gelato, etc.) | Native |
+    | **Off-Chain Compute** | Oracles (Chainlink) | Native (CIP-2) |
+    | **Consensus** | PoS (Gasper) | Simplex BFT |
+    | **Target Use Case** | General DeFi | AI Agents + Computation |
+  </Accordion>
+</AccordionGroup>
+
+## Technical Questions
+
+<AccordionGroup>
+  <Accordion title="How does dual-metered gas work?" icon="gauge">
+    Cowboy separates resource pricing into **two dimensions**:
+    
+    **Cycles (Computation)**:
+    - Measures CPU work
+    - Every bytecode instruction costs cycles
+    - Example: Function call = 10 cycles
+    
+    **Cells (Data/Storage)**:
+    - Measures data and storage
+    - 1 Cell = 1 byte
+    - Charged at I/O boundaries
+    
+    **Why?**
+    - Fair pricing: Don't subsidize compute-heavy apps with storage costs
+    - Independent markets: Each resource has its own basefee
+    - Predictable: Know exactly what you're paying for
+    
+    See [Fee Model](/architecture/fees/overview) for details.
+  </Accordion>
+  
+  <Accordion title="How are timers different from Gelato/Chainlink Automation?" icon="clock">
+    **Cowboy Native Timers** (CIP-1):
+    
+    ✅ **Protocol-native**: No external service required
+    ✅ **Gas bidding**: Actors bid for execution priority
+    ✅ **Guaranteed execution**: Timers eventually execute (not reliant on keepers)
+    ✅ **Fair scheduling**: Based on economic priority, not FCFS
+    
+    **vs. External Automation**:
+    
+    | Feature | Gelato/Chainlink | Cowboy |
+    |---------|------------------|--------|
+    | Integration | External contract | Native API |
+    | Reliability | Depends on keepers | Protocol-guaranteed |
+    | Priority | FCFS or fixed | Dynamic bidding |
+    | Cost | Fixed fee + gas | Just gas (cycles) |
+    
+    See [Timers & Scheduler](/architecture/scheduler/overview).
+  </Accordion>
+  
+  <Accordion title="How does off-chain compute work?" icon="server">
+    **Verifiable Off-Chain Compute** (CIP-2):
+
+    1. **Submit Task**: Actor calls `runner.llm()`, `runner.http()`, or `runner.mcp()` from within an `@runner.continuation` handler (CIP-6 SDK)
+    2. **VRF Selection**: Runners deterministically selected via VRF snapshot
+    3. **Execution**: Selected runners execute the task off-chain (LLM inference, HTTP call, MCP tool)
+    4. **Result Submission**: Runners submit results + optional proof on-chain
+    5. **Resume**: Actor's continuation resumes in a later block with the result
+    6. **Payment**: Actor chooses a winning result; payment flows to the runner(s)
+
+    See [Off-Chain Compute](/architecture/offchain/overview) and [SDK Overview](/developers/sdk).
+  </Accordion>
+  
+  <Accordion title="Is Cowboy deterministic?" icon="fingerprint">
+    **Yes, completely deterministic**. All nodes must produce identical results.
+    
+    **How we achieve it**:
+    - ✅ Software floating-point (no hardware FPU)
+    - ✅ No JIT compilation
+    - ✅ Deterministic GC (reference counting)
+    - ✅ No system calls (time, random, I/O)
+    - ✅ Module whitelist
+    
+    **What's forbidden**:
+    ```python
+    # ❌ These will fail:
+    import os
+    import random
+    import time
+    import requests
+    ```
+    
+    **Use instead**:
+    - ✅ Use protocol-provided randomness/time context APIs (instead of local RNG/system time)
+    - ✅ Use protocol storage and off-chain submission interfaces (see related docs)
+    
+    See [Determinism & Sandboxing](/architecture/actor-vm/determinism-and-sandbox).
+  </Accordion>
+  
+  
+  <Accordion title="How is consensus achieved?" icon="handshake">
+    Cowboy uses **Simplex BFT** consensus:
+    
+    **Properties**:
+    - Byzantine Fault Tolerant (BFT)
+    - Deterministic finality (no reorgs)
+    - Leader rotation
+    - Requires 2/3+ honest validators
+    
+    **Phases**:
+    1. Leader proposes block
+    2. Validators vote (QC = Quorum Certificate)
+    3. Block finalized with 2/3+ votes
+    4. Next leader elected
+    
+    **vs. Nakamoto Consensus** (Bitcoin):
+    - ✅ Faster: 2s vs 10min
+    - ✅ Finality: Immediate vs probabilistic
+    - ❌ More validators needed
+  </Accordion>
+</AccordionGroup>
+
+## Development Questions
+
+<AccordionGroup>
+  <Accordion title="Do I need to know Rust?" icon="rust">
+    **No!** You only need Python to build actors.
+    
+    **Rust is only needed if you want to**:
+    - Contribute to the core protocol
+    - Build custom validator nodes
+    - Optimize VM performance
+    
+    **For actor development**:
+    - ✅ Python only
+    - ✅ Familiar SDK
+    - ✅ Standard Python tooling
+  </Accordion>
+  
+  <Accordion title="How do I test actors locally?" icon="vial">
+    **Testing Options**:
+
+    **1. Unit Tests** (Fastest):
+    - Use standard Python test frameworks (pytest/unittest) to unit-test business logic
+    - The `cowboy_sdk` ships a `mock_host` module for stubbing the PVM host API
+
+    **2. Mesa Devnet** (Shared, recommended first):
+    - `cowboy init dev` targets the shared Mesa devnet
+    - Deploy and execute actors against a real chain without a source checkout
+
+    **3. Local Devnet** (Contributor / advanced):
+    - Use this when you are working from the full Cowboy source workspace and need your own validator or runner
+    - Point the CLI at it with `cowboy init local`
+
+    See [Quickstart](/getting-started/quickstart) for the full flow.
+  </Accordion>
+  
+  <Accordion title="How much does it cost to deploy an actor?" icon="dollar-sign">
+    **Devnet**: Free while the faucet is available. `cowboy init dev` creates a devnet wallet and requests funds from the configured faucet.
+
+    **Mainnet** (when live):
+    - Costs are metered separately by Cycles (compute) and Cells (bytes) with their respective basefees + tips
+    - Influencing factors: bytecode size (Cells), constructor complexity (Cycles), current basefees
+    - Set `--cycles-limit` and `--cells-limit` on `cowboy actor deploy`; see [Fee Model](/architecture/fees/overview)
+  </Accordion>
+  
+  <Accordion title="Can I use external Python packages?" icon="box-open">
+    **Only the curated stdlib subset shipped with the PVM.**
+
+    **Forbidden**:
+    - ❌ `requests`, `httpx`, `urllib.request` — network I/O
+    - ❌ `numpy`, `pandas`, `tensorflow`, `torch` — native C/C++ extensions
+    - ❌ `os`, `subprocess`, `socket` — system calls
+    - ❌ `random`, `time` — non-deterministic (use protocol-provided APIs)
+
+    **Allowed** (curated):
+    - ✅ `collections`, `itertools`, `functools` — deterministic data structures
+    - ✅ `json` — encoding/decoding
+    - ✅ `math` — deterministic software FP
+    - ✅ `hashlib` — BLAKE3, SHA-256, etc.
+    - ✅ `pvm_host` — low-level host API
+    - ✅ `cowboy_sdk` — high-level SDK (CIP-6)
+
+    **For external data or compute**:
+    - Use `runner.llm()` / `runner.http()` / `runner.mcp()` from an `@runner.continuation` handler (CIP-2)
+    - Large data: store in [CBFS](/cips/cip-4-storage) volumes
+
+    See [Determinism & Sandboxing](/architecture/actor-vm/determinism-and-sandbox).
+  </Accordion>
+  
+  <Accordion title="How do I debug a failed transaction?" icon="bug">
+    **Steps** (general guidance):
+    
+    1. Check the transaction receipt/error message (block explorer or SDK)
+    2. Common causes:
+       - Insufficient Cycles limit: increase `gas_limit_cycles` or optimize computation
+       - Insufficient Cells limit: increase `gas_limit_cells` or reduce data
+       - Input or business validation failure: verify input data and business logic
+       - Insufficient permissions: check access control and caller
+    3. Unit test locally before on-chain validation
+  </Accordion>
+  
+  <Accordion title="How do I upgrade an actor?" icon="arrow-up">
+    **Actors are immutable by default**; conceptual strategies include:
+    
+    - Proxy pattern: delegate calls to a replaceable implementation with strict access control
+    - Redeploy: deploy a new version, migrate state, update frontend addresses
+    - Migration contract: dedicated migration process (batch validation/rollback strategy)
+    
+    Security notes: access control, replay protection, data consistency checks.
+  </Accordion>
+</AccordionGroup>
+
+## Economics & Token Questions
+
+<AccordionGroup>
+  
+  <Accordion title="How are fees calculated?" icon="calculator">
+    **Formula**:
+    ```
+    Total Fee = (Cycles Used × Basefee_Cycle) + 
+                (Cells Used × Basefee_Cell) +
+                (Cycles Used × Tip_Cycle) +
+                (Cells Used × Tip_Cell)
+    ```
+    
+    **Basefee**: Burned 🔥 (deflationary)
+    **Tip**: To block producer (incentive)
+    
+    See [Fee Model](/architecture/fees/overview).
+  </Accordion>
+  
+  <Accordion title="Why do basefees fluctuate?" icon="chart-line">
+    **Dual EIP-1559 Mechanism**:
+    
+    Basefees adjust dynamically based on demand:
+    
+    ```
+    If block usage > target (50%):
+      → Basefee increases
+    
+    If block usage < target (50%):
+      → Basefee decreases
+    ```
+    
+    **Example**:
+    ```
+    Block N: 80% utilization
+    → Basefee +7.5%
+    
+    Block N+1: 30% utilization
+    → Basefee -5%
+    ```
+    
+    **Benefits**:
+    - Fair pricing (supply/demand)
+    - Predictable (can estimate fees)
+    - Anti-spam (expensive during congestion)
+    
+    See [Dual EIP-1559](/architecture/fees/dual-eip1559).
+  </Accordion>
+  
+</AccordionGroup>
+
+  
+
+## Community & Support
+
+<AccordionGroup>
+  <Accordion title="Where can I get help?" icon="circle-question">
+    **Official Channels**:
+    - 🐛 [GitHub Issues](https://github.com/cowboyinc/cowboy/issues) — Bug reports and feature requests
+    - 📧 Support: `Support@cowboy.io`
+    - 📖 [Contributing Guide](/contributing/how-to-propose) — How to propose protocol changes (CIPs)
+  </Accordion>
+  
+  <Accordion title="How can I contribute?" icon="code-pull-request">
+    **Ways to Contribute**:
+    
+    1. **Code**:
+       - Core protocol (Rust)
+       - SDK improvements (Python)
+       - Tooling and CLI
+    
+    2. **Documentation**:
+       - Write tutorials
+       - Fix typos
+       - Add examples
+    
+    3. **Testing**:
+       - Test against the Mesa devnet (`cowboy init dev`)
+       - Run a local devnet from a full source workspace when you need contributor-level control
+       - Report bugs on GitHub
+
+    4. **Community**:
+       - Answer questions in GitHub Discussions
+       - Write blog posts and tutorials
+       - Create videos and demos
+    
+    See [Contributing Guide](/contributing/how-to-propose).
+  </Accordion>
+  
+  
+</AccordionGroup>
+
+## Still Have Questions?
+
+<CardGroup cols={2}>
+  <Card title="GitHub Issues" icon="github" href="https://github.com/cowboyinc/cowboy/issues">
+    Browse existing issues or file a new one
+  </Card>
+
+  <Card title="Email Support" icon="envelope" href="mailto:Support@cowboy.io">
+    Reach the team directly
+  </Card>
+</CardGroup>

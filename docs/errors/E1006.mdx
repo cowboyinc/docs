@@ -1,0 +1,44 @@
+---
+title: "E1006 — Out of cells"
+description: "Out of cells"
+---
+
+# E1006 — Out of cells
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1006` |
+| **Slug** | `E1006` |
+| **Category** | `gas` (Gas) |
+| **CIP** | CIP-3 |
+
+## What happened
+
+Out of cells.
+
+## Why it happened
+
+The transaction consumed more storage cells than the `cells_limit` allows.
+
+## How to fix
+
+Increase `cells_limit` or reduce state writes / returned data size.
+
+## Receipt example
+
+```json
+{
+  "code": 1006,
+  "slug": "E1006",
+  "category": "gas",
+  "what": "Out of cells",
+  "fix": "Increase `cells_limit` or reduce state writes / returned data size.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1006"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

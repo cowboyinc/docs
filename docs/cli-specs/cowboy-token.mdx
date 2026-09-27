@@ -1,0 +1,254 @@
+---
+title: "cowboy token"
+description: Create and manage CIP-20 fungible tokens on the Cowboy blockchain
+icon: coins
+---
+
+## Synopsis
+
+```bash
+cowboy token create --name <str> --symbol <str> --initial-supply <n> [flags]
+cowboy token transfer --token-id <hex> --to <address> --amount <n>
+cowboy token approve --token-id <hex> --spender <address> --amount <n>
+cowboy token mint --token-id <hex> --to <address> --amount <n>
+cowboy token burn --token-id <hex> --amount <n>
+cowboy token freeze --token-id <hex> --account <address>
+cowboy token unfreeze --token-id <hex> --account <address>
+cowboy token info --token-id <hex>
+cowboy token balance --token-id <hex> --address <address>
+cowboy token list
+```
+
+All write commands use [key auto-discovery](/cli-specs/key-auto-discovery) for the private key.
+
+## Subcommands
+
+### `cowboy token create`
+
+Create a new CIP-20 fungible token.
+
+**Behavior:**
+
+1. Load the private key using [key auto-discovery](/cli-specs/key-auto-discovery).
+2. Build a token creation transaction with the specified parameters.
+3. Sign and submit the transaction.
+4. Print the new token ID.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--name` | Required | Token name (e.g., "My Token") |
+| `--symbol` | Required | Token symbol (e.g., "MTK") |
+| `--decimals` | `18` | Number of decimal places |
+| `--initial-supply` | Required | Initial token supply |
+| `--max-supply` | None | Maximum supply cap (optional, unlimited if omitted) |
+| `--transfer-hook` | None | Actor address to call on transfers (optional) |
+| `--metadata-uri` | None | URI for off-chain token metadata (optional) |
+
+**Example:**
+
+```bash
+$ cowboy token create --name "My Token" --symbol "MTK" --initial-supply 1000000
+Transaction: 0xabc123...
+Token ID: 0xtok456...
+  Name: My Token
+  Symbol: MTK
+  Decimals: 18
+  Initial supply: 1000000
+```
+
+---
+
+### `cowboy token transfer`
+
+Transfer tokens to another account.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--token-id` | Required | Token ID (hex) |
+| `--to` | Required | Recipient address (hex) |
+| `--amount` | Required | Amount to transfer |
+
+**Example:**
+
+```bash
+$ cowboy token transfer --token-id 0xtok456... --to 0x1a2B...C3D4 --amount 500
+Transaction: 0xdef789...
+Transferred 500 MTK to 0x1a2B...C3D4
+```
+
+---
+
+### `cowboy token approve`
+
+Approve a spender to transfer tokens on your behalf.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--token-id` | Required | Token ID (hex) |
+| `--spender` | Required | Spender address (hex) |
+| `--amount` | Required | Approved amount |
+
+**Example:**
+
+```bash
+$ cowboy token approve --token-id 0xtok456... --spender 0x5e6F...A7B8 --amount 1000
+Transaction: 0x123abc...
+Approved 0x5e6F...A7B8 to spend 1000 MTK
+```
+
+---
+
+### `cowboy token mint`
+
+Mint new tokens (creator only).
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--token-id` | Required | Token ID (hex) |
+| `--to` | Required | Recipient address (hex) |
+| `--amount` | Required | Amount to mint |
+
+**Example:**
+
+```bash
+$ cowboy token mint --token-id 0xtok456... --to 0x7a3B...F92E --amount 10000
+Transaction: 0x456def...
+Minted 10000 MTK to 0x7a3B...F92E
+```
+
+---
+
+### `cowboy token burn`
+
+Burn tokens from your own balance.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--token-id` | Required | Token ID (hex) |
+| `--amount` | Required | Amount to burn |
+
+**Example:**
+
+```bash
+$ cowboy token burn --token-id 0xtok456... --amount 500
+Transaction: 0x789ghi...
+Burned 500 MTK
+```
+
+---
+
+### `cowboy token freeze`
+
+Freeze an account from transferring a specific token (creator only).
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--token-id` | Required | Token ID (hex) |
+| `--account` | Required | Account to freeze (hex) |
+
+**Example:**
+
+```bash
+$ cowboy token freeze --token-id 0xtok456... --account 0x1a2B...C3D4
+Transaction: 0xaaa...
+Frozen 0x1a2B...C3D4 for token 0xtok456...
+```
+
+---
+
+### `cowboy token unfreeze`
+
+Unfreeze a previously frozen account (creator only).
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--token-id` | Required | Token ID (hex) |
+| `--account` | Required | Account to unfreeze (hex) |
+
+**Example:**
+
+```bash
+$ cowboy token unfreeze --token-id 0xtok456... --account 0x1a2B...C3D4
+Transaction: 0xbbb...
+Unfrozen 0x1a2B...C3D4 for token 0xtok456...
+```
+
+---
+
+### `cowboy token info`
+
+Query token metadata.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--token-id` | Required | Token ID (hex) |
+
+**Example:**
+
+```bash
+$ cowboy token info --token-id 0xtok456...
+Token: 0xtok456...
+  Name: My Token
+  Symbol: MTK
+  Decimals: 18
+  Total supply: 1000000
+  Max supply: unlimited
+  Creator: 0x7a3B...F92E
+```
+
+---
+
+### `cowboy token balance`
+
+Query the token balance of an account.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--token-id` | Required | Token ID (hex) |
+| `--address` | Required | Account address (hex) |
+
+**Example:**
+
+```bash
+$ cowboy token balance --token-id 0xtok456... --address 0x7a3B...F92E
+Balance: 999500 MTK
+```
+
+---
+
+### `cowboy token list`
+
+List all CIP-20 tokens on the chain.
+
+**Example:**
+
+```bash
+$ cowboy token list
+0xtok456...  MTK   My Token        Supply: 1000000
+0xtok789...  USDC  USD Coin Test   Supply: 5000000
+```
+
+## Edge Cases
+
+- `mint` and `freeze`/`unfreeze` require the caller to be the token creator.
+- `burn` only burns from the caller's own balance.
+- `info`, `balance`, and `list` are read-only and do not require a private key.
+- If `--max-supply` is set and a mint would exceed it, the transaction fails.

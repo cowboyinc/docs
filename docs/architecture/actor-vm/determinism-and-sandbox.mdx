@@ -1,0 +1,425 @@
+---
+title: Determinism & Sandboxing
+description: How Cowboy achieves deterministic Python execution in a blockchain environment
+---
+
+## Introduction
+
+Cowboy's Actor VM executes Python code in a **deterministic** and **sandboxed** environment. This document explains the technical challenges and solutions for running a high-level, dynamic language like Python on a blockchain.
+
+<Tip>
+  **Core Challenge**: Python is inherently non-deterministic and has unlimited system access. We must constrain it without breaking its expressiveness.
+</Tip>
+
+> Note: Examples in this page are conceptual snippets/pseudocode. Final interfaces and usage should follow the SDK and Developer Guide. CIP specifications define normative protocol behavior.
+
+## Why Determinism Matters
+
+### The Consensus Requirement
+
+Same input and environment MUST lead to the same state transition and outputs on all nodes; any divergence implies consensus failure.
+
+**What happens if non-deterministic**:
+- ❌ Nodes cannot agree on state root
+- ❌ Chain halts or forks
+- ❌ Network is unusable
+
+### Sources of Non-Determinism
+
+Key sources include: system time, OS randomness, filesystem and network I/O, hardware floating-point variance, and reliance on container iteration order. These must be either prohibited or made deterministic per protocol rules.
+
+## Cowboy's Determinism Solutions
+
+### 1. No System Dependencies
+
+**Problem**: System calls produce different results on different machines.
+
+**Solution**: Complete isolation from host system.
+
+<Tabs>
+  <Tab title="Prohibited Operations">
+    ```python
+    # ❌ All of these are FORBIDDEN:
+    
+    import os
+    hostname = os.gethostname()  # ImportError
+    
+    import socket
+    s = socket.socket()  # ImportError
+    
+    import time
+    now = time.time()  # ImportError
+    
+    import random
+    x = random.random()  # ImportError
+    
+    open("/etc/passwd")  # ImportError (no file access)
+    
+    import requests
+    requests.get("...")  # ImportError
+    ```
+  </Tab>
+  
+  <Tab title="Allowed Alternatives">
+    - ✅ Use protocol-provided block context (e.g., block height) as a deterministic time source
+    - ✅ Use protocol-provided VRF randomness (instead of local RNG)
+    - ✅ Use Off-chain Compute for external data (see Off-chain docs)
+    - ✅ Use protocol storage APIs for reads and writes
+  </Tab>
+</Tabs>
+
+### 2. Software Floating-Point
+
+**Problem**: Hardware FPUs produce slightly different results across CPU architectures.
+
+**Solution**: Deterministic software implementation of IEEE 754.
+
+```python
+# All floating-point operations use software implementation
+x = 3.14159 * 2.71828  # Same result on ALL hardware
+
+# Breakdown:
+# 1. Fetch operands (3.14159, 2.71828)
+# 2. Software multiply using IEEE 754 algorithm
+# 3. Round result deterministically
+# 4. Return exact same bit pattern on all nodes
+
+ 
+ 
+ 
+```
+
+**Trade-off**:
+- ✅ Deterministic across all platforms
+- ❌ ~2-5× slower than native FPU
+- ✅ Acceptable for blockchain consensus
+
+### 3. Deterministic Memory Management
+
+**Problem**: Garbage collection timing is non-deterministic in standard Python.
+
+**Solution**: Reference counting with immediate, deterministic cleanup.
+
+<Tabs>
+  <Tab title="Standard Python GC">
+    ```python
+    # ❌ Non-deterministic GC
+    
+    def process():
+        data = [0] * 1000000
+        result = compute(data)
+        return result
+        # When does GC run?
+        # - Maybe immediately
+        # - Maybe after 100 more allocations
+        # - Maybe after next GC cycle
+        # → Non-deterministic timing!
+    ```
+  </Tab>
+  
+  <Tab title="Cowboy Deterministic GC">
+    Deterministic reference counting with immediate cleanup on refcount reaching zero; destruction costs are explicitly metered in Cycles per CIP‑3.
+  </Tab>
+</Tabs>
+
+**Key properties**:
+- ✅ **Immediate**: Objects destroyed when refcount reaches 0
+- ✅ **Deterministic**: Same operations → same cleanup timing
+- ✅ **Metered**: Destruction costs charged in Cycles
+- ❌ **No cycle detection**: Circular references forbidden
+
+### 4. No JIT Compilation
+
+**Problem**: JIT compilers make non-deterministic optimization decisions.
+
+**Solution**: Pure interpretation mode only.
+
+```python
+# Traditional Python (CPython with JIT):
+# 1. Interpret bytecode
+# 2. Hot loop detected
+# 3. JIT compile to machine code
+# 4. Execute native code
+# → When does JIT kick in? Non-deterministic!
+# → What optimizations apply? Platform-dependent!
+
+# Cowboy Python (Pure Interpreter):
+# 1. Interpret bytecode
+# 2. Continue interpreting
+# 3. Always interpret
+# → Same bytecode → same execution path
+# → Same cost, always ✅
+```
+
+**Trade-off**:
+- ✅ Deterministic execution
+- ✅ Predictable gas costs
+- ❌ Slower than JIT (10-100×)
+- ✅ Acceptable for blockchain (security > speed)
+
+### 5. Dictionary Ordering and Serialization
+
+**Problem**: Relying on dictionary iteration order can introduce non-determinism.
+
+**Solution**: Do not rely on in-memory iteration order when it affects results. When order matters, sort keys explicitly. Per CIP‑3, dictionary keys MUST be sorted lexicographically during serialization to ensure determinism.
+
+```python
+# When order matters, sort explicitly
+for key in sorted(d.keys()):
+    process(key)
+```
+
+**Implementation**:
+- Serialization: keys sorted lexicographically (CIP-3 requirement)
+- In execution paths where order impacts results, explicitly sort
+
+### 6. Prohibited Async Concurrency
+
+**Problem**: `async/await` scheduling can be non-deterministic.
+
+**Solution**: Strict deterministic scheduling (FIFO queue).
+
+```python
+# ❌ Forbidden: Non-deterministic concurrency
+async def task1():
+    await asyncio.gather(subtask_a(), subtask_b())
+    # Execution order undefined!
+
+# ✅ Allowed: Deterministic async
+async def task2():
+    result_a = await subtask_a()  # Executes first
+    result_b = await subtask_b()  # Executes second
+    # Order always same ✅
+```
+
+**Rules**:
+- Single-threaded execution only
+- FIFO queue for awaiting coroutines
+- No `asyncio.gather()` or similar
+- Deterministic scheduling guaranteed
+
+### 7. String Encoding Determinism
+
+**Problem**: Encoding edge cases handled differently across platforms.
+
+**Solution**: UTF-8 only, strict mode.
+
+```python
+# ✅ Allowed: UTF-8 with strict error handling
+text = "Hello world"
+encoded = text.encode('utf-8', errors='strict')
+# Same bytes on all platforms
+
+# ❌ Forbidden: Other encodings
+text.encode('latin-1')  # ValueError
+text.encode('utf-8', errors='ignore')  # ValueError (non-strict)
+
+# ❌ Forbidden: Invalid UTF-8
+invalid = b'\xff\xfe'
+try:
+    invalid.decode('utf-8', errors='strict')
+except UnicodeDecodeError:
+    pass  # Must raise exception, cannot silently replace
+```
+
+### 8. Integer Precision Limits
+
+**Problem**: Arbitrary precision enables DoS attacks.
+
+**Solution**: 4096-bit limit with overflow checks.
+
+```python
+# ✅ Allowed: Numbers up to 4096 bits
+x = 2 ** 4096  # OK: Exactly at limit
+
+# ❌ Forbidden: Exceeding limit
+y = 2 ** 4097  # OverflowError
+
+# ❌ Forbidden: Intermediate overflow
+a = 2 ** 4000
+b = 2 ** 4000
+c = a * b  # OverflowError (result would be 8000 bits)
+```
+
+**Benefits**:
+- ✅ Prevents big-int DoS attacks
+- ✅ Proportional costs for large integers
+- ✅ Still larger than practical needs (4096 bits >> 256 bits for crypto)
+
+## Sandboxing Mechanisms
+
+### Module Whitelist
+
+**Enforcement**: Import hook intercepts all imports.
+
+```python
+# Protocol whitelist (example subset per CIP-3)
+ALLOWED_MODULES = {
+    # Data structures
+    "collections", "itertools",
+    
+    # Math (deterministic implementation)
+    "math",
+    
+    # Hashing/crypto
+    "hashlib",
+    
+    # Serialization
+    "json",
+    
+    # Protocol APIs
+    "cowboy.messaging", "cowboy.storage", "cowboy.timers", "cowboy.crypto"
+}
+
+def import_hook(module_name):
+    if module_name in ALLOWED_MODULES:
+        return load_module(module_name)
+    else:
+        raise ImportError(f"Module '{module_name}' not whitelisted")
+```
+
+**Costs**:
+- First import: 100 cycles + module init
+- Cached import: 5 cycles
+- Failed import: 50 cycles (penalty)
+
+### System Isolation
+
+Actors cannot perform file, network, or process operations. Access to host OS is prohibited; only protocol-provided, deterministic and metered host APIs are available.
+
+### Resource Limits
+
+Enforcement overview:
+- Cycles: instruction-level metering; execution halts on limit (CIP‑3).
+- Cells: metered at I/O boundaries (calldata, storage, blobs, return data) per CIP‑3.
+- Memory/stack: hard limits enforced; overflow triggers deterministic errors.
+
+### Host Function APIs
+
+**Enforcement**: Only whitelisted host functions callable.
+
+```python
+# Conceptual host APIs (non-normative)
+# Examples: storage_get/set, send, schedule_timer, verify_ecdsa, hash_keccak256, submit_offchain_task
+
+# ✅ Only approved, metered, deterministic host functions are callable
+
+# ❌ Cannot call arbitrary native functions
+# ❌ Cannot load C extensions
+# ❌ Cannot access CPython internals
+```
+
+## Testing Determinism
+
+A determinism test suite validates that identical inputs produce identical outputs and state transitions across environments, covering metering, serialization (sorted keys), exception handling, and software floating‑point behavior.
+
+## Sandboxing Verification
+
+### Security Audit Checklist
+
+<AccordionGroup>
+  <Accordion title="System Isolation" icon="shield">
+    - [ ] No file system access
+    - [ ] No network access
+    - [ ] No process creation
+    - [ ] No system time access
+    - [ ] No environment variable access
+    - [ ] No native code execution
+  </Accordion>
+  
+  <Accordion title="Module Restrictions" icon="list-check">
+    - [ ] Import whitelist enforced
+    - [ ] No dynamic module loading
+    - [ ] No C extension loading
+    - [ ] Standard library limited
+    - [ ] Protocol APIs only
+  </Accordion>
+  
+  <Accordion title="Resource Limits" icon="gauge">
+    - [ ] Cycle limit enforced
+    - [ ] Cell limit enforced
+    - [ ] Memory limit enforced
+    - [ ] Stack depth limit enforced
+    - [ ] Integer size limit enforced
+  </Accordion>
+  
+  <Accordion title="Determinism Guarantees" icon="fingerprint">
+    - [ ] Software FPU only
+    - [ ] No JIT compilation
+    - [ ] Deterministic GC
+    - [ ] No true randomness
+    - [ ] No system dependencies
+  </Accordion>
+</AccordionGroup>
+
+## Performance Considerations
+
+Determinism and security take precedence over raw speed. The VM uses software floating‑point, prohibits JIT, and enforces deterministic memory management per CIP‑3.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Embrace Determinism" icon="fingerprint">
+    Design with determinism in mind from the start:
+    
+    ```python
+    # ✅ Good: Deterministic by design
+    def process_batch(self, items):
+        # Sort for consistent ordering
+        sorted_items = sorted(items, key=lambda x: x.id)
+        
+        for item in sorted_items:
+            self.process_item(item)
+    ```
+  </Accordion>
+  
+  <Accordion title="Use Protocol APIs" icon="plug">
+    Leverage protocol-provided functionality:
+    
+    ```python
+    # For randomness (conceptual):
+    rand = vrf_random()
+    
+    # For time:
+    current_time = self.block.timestamp
+    
+    # For external data (conceptual; CIP-2 Dispatcher):
+    submit_offchain_task(...)
+    ```
+  </Accordion>
+  
+  <Accordion title="Test Extensively" icon="vial">
+    Verify determinism in tests:
+    
+    ```python
+    def test_my_actor(self):
+        # Execute same input multiple times
+        results = [self.execute(input) for _ in range(10)]
+        
+        # All must be identical
+        assert all(r == results[0] for r in results)
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Actor VM Overview" icon="microchip" href="/architecture/actor-vm/overview">
+    High-level VM architecture
+  </Card>
+  <Card title="Resource Limits" icon="gauge" href="/architecture/actor-vm/resource-limits">
+    Detailed limit specifications
+  </Card>
+  <Card title="CIP-3 Metering" icon="file-lines" href="/cips/cip-3-fee-model">
+    Complete metering specification
+  </Card>
+  <Card title="Best Practices" icon="lightbulb" href="/developers/best-practices">
+    Writing efficient actors
+  </Card>
+</CardGroup>
+
+## Further Reading
+
+- [CIP-3: Advanced Metering Challenges](/cips/cip-3-fee-model)
+- [Python VM Implementation Notes](https://github.com/cowboyinc/cowboy)

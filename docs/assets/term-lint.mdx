@@ -1,0 +1,77 @@
+---
+title: Terminology Linting
+description: Automated tools to enforce consistent terminology throughout documentation
+icon: hashtag
+---
+
+## Introduction
+
+Terminology linting ensures consistent use of Cowboy-specific terms across all documentation. This prevents confusion and maintains professional quality.
+
+<Tip>
+  **Goal**: Catch terminology errors early and keep docs consistent
+</Tip>
+
+---
+
+## Linting Rules (Core)
+
+### Required Terms
+
+**Must use these exact terms** (case-sensitive):
+
+| Context | ✅ Required Term | ❌ Prohibited Terms |
+|---------|-----------------|-------------------|
+| Compute unit | **Actor** | smart contract, contract, dapp |
+| Off-chain compute | **Runner** | oracle, worker |
+| Compute gas | **Cycles** | gas (alone), compute units |
+| Data gas | **Cells** | bytes, data units |
+| Native token | **CBY** | Cowboy token, COWBOY, cowboy |
+| Message passing (Actor→Actor) | **send message** | contract call (for inter-actor communication) |
+| State storage | **storage** | state, database |
+| Block producer | **validator** | miner |
+
+<Info>
+  For user-submitted transactions, phrasing like “invoke the actor’s handler” is acceptable. The preference for “send message” specifically targets Actor→Actor communication.
+</Info>
+
+### Capitalization Rules
+
+- Capitalize Cowboy concepts: Actor, Runner, Cycles, Cells, Validator.
+- Lowercase for generic references: "an actor in the system", "validator nodes".
+- CBY is always all caps.
+
+---
+
+## Common Violations (Quick Fixes)
+
+**❌ Wrong terminology** → use Cowboy terms
+```markdown
+The smart contract stores data on-chain.
+```
+```markdown
+The Actor stores data on-chain.
+```
+
+**❌ Vague "gas"** → be specific
+```markdown
+Transactions consume gas based on usage.
+```
+```markdown
+Transactions consume Cycles (compute) and Cells (data) based on usage.
+```
+
+---
+
+## Severity Levels (Minimal)
+
+- Error (must fix): wrong core terms (e.g., smart contract → Actor), oracle → Runner, "contract call" used for Actor→Actor communication.
+- Warning (should fix): capitalization, vague "gas", using generic "node" when "validator" is intended, missing full term on first acronym use.
+- Info (optional): stylistic suggestions, non-blocking wording tweaks.
+
+---
+
+<Info>
+  v0.1 keeps the linting scope small. We will expand rules and tooling in later milestones.
+</Info>
+

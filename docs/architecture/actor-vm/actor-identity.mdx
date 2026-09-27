@@ -1,0 +1,129 @@
+---
+title: Actor Identity
+description: Discoverable actor metadata using dunder storage keys
+---
+
+## Introduction
+
+**Actor Identity** is a convention for storing discoverable metadata inside an actor's persistent storage using **dunder keys** (double-underscore wrapped keys like `__name__`). This allows tooling -- explorers, CLIs, dashboards, and indexers -- to display human-readable information about any deployed actor without parsing its source code.
+
+> Note: Actor Identity is a convention, not a protocol enforcement. Actors that follow this convention benefit from ecosystem tooling integration.
+
+## Why Actor Identity?
+
+Without a standard for metadata, every actor stores information differently:
+
+```python
+# Actor A
+self.storage['name'] = 'Weather Bot'
+
+# Actor B
+self.storage['cfg:name'] = 'Swap Router'
+
+# Actor C stores no name at all
+```
+
+Tooling cannot reliably discover what an actor is, who deployed it, or what it does. Actor Identity solves this by reserving a small set of **dunder keys** that all ecosystem tools can read.
+
+## Dunder Keys
+
+The term **"dunder"** comes from Python's convention of double-underscore names (`__init__`, `__name__`, `__doc__`). In Python, dunders signal "language-reserved, don't override casually." Actor Identity adopts this same convention for storage keys.
+
+### Reserved Identity Keys
+
+| Key | Type | Required | Description |
+|-----|------|----------|-------------|
+| `__name__` | `str` | Yes | Human-readable display name |
+| `__description__` | `str` | No | Short description of what the actor does |
+| `__version__` | `str` | No | Semantic version (e.g., `"1.0.0"`) |
+
+### Example
+
+```python
+from cowboy_sdk import actor
+
+@actor
+class WeatherActor:
+    def init(self, payload):
+        # Actor Identity (dunder keys)
+        self.storage['__name__'] = 'Weather Actor'
+        self.storage['__description__'] = 'Fetches weather data via LLM runner'
+        self.storage['__version__'] = '1.0.0'
+
+        # Business data (regular keys)
+        self.storage['query_count'] = 0
+```
+
+## How Tooling Uses Actor Identity
+
+### Explorer / Dashboard
+
+When displaying an actor's page, the explorer reads identity keys to show a human-friendly summary instead of raw storage dumps:
+
+```
++------------------------------------------+
+|  Weather Actor                           |
+|  Fetches weather data via LLM runner     |
+|  v1.0.0                                  |
+|  Address: 0x1234...5678                  |
++------------------------------------------+
+```
+
+### CLI
+
+```bash
+$ cowboy actor info 0x1234...5678
+
+Name:        Weather Actor
+Description: Fetches weather data via LLM runner
+Version:     1.0.0
+Address:     0x1234...5678
+Balance:     150.00 CBY
+```
+
+## Design Decisions
+
+### Why dunder keys instead of a separate registry?
+
+A protocol-level registry would require consensus changes, add complexity, and create a single point of contention. Dunder keys use the existing storage infrastructure with zero protocol changes -- it's purely a convention.
+
+### Why not enforce at the protocol level?
+
+Actor Identity is opt-in. Enforcing it would add protocol complexity and break the principle that actors control their own storage. Ecosystem tooling incentivizes adoption: actors with identity keys get better display in explorers and dashboards.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Always set identity in init()" icon="flag">
+    Set all identity keys during `init()` so they're available from the moment the actor is deployed. This ensures explorers and indexers can discover the actor immediately.
+  </Accordion>
+
+  <Accordion title="Keep __name__ short and unique" icon="tag">
+    Use a concise, descriptive name (2-4 words). Avoid generic names like "My Actor" or "Test". The name should help users identify the actor's purpose at a glance.
+  </Accordion>
+
+  <Accordion title="Version your actors" icon="code-branch">
+    Use semantic versioning in `__version__`. When deploying an updated actor, increment the version so users and tooling can distinguish between versions.
+  </Accordion>
+
+  <Accordion title="Never use dunder keys for business data" icon="triangle-exclamation">
+    Keys matching the `__*__` pattern are reserved for identity metadata. Using them for business logic will conflict with ecosystem tooling.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Minimal Actor" icon="code" href="/architecture/actor-vm/minimal-actor">
+    Build your first actor with identity keys
+  </Card>
+  <Card title="Actor VM Overview" icon="microchip" href="/architecture/actor-vm/overview">
+    Understand the execution model
+  </Card>
+</CardGroup>
+
+## Further Reading
+
+- [Actor VM Overview](/architecture/actor-vm/overview)
+- [Minimal Actor](/architecture/actor-vm/minimal-actor)
+- [Resource Limits](/architecture/actor-vm/resource-limits)

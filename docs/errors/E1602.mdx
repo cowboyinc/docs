@@ -1,0 +1,44 @@
+---
+title: "E1602 — Runner not found"
+description: "Runner not found"
+---
+
+# E1602 — Runner not found
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1602` |
+| **Slug** | `E1602` |
+| **Category** | `runner` (Runner / Consensus) |
+| **CIP** | CIP-2 |
+
+## What happened
+
+Runner not found.
+
+## Why it happened
+
+The runner address is not registered in the runner registry.
+
+## How to fix
+
+Register the runner with sufficient stake before taking jobs.
+
+## Receipt example
+
+```json
+{
+  "code": 1602,
+  "slug": "E1602",
+  "category": "runner",
+  "what": "Runner not found",
+  "fix": "Register the runner with sufficient stake before taking jobs.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1602"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

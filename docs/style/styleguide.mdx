@@ -1,0 +1,143 @@
+---
+title: Style Guide
+description: Writing style guidelines for Cowboy documentation
+icon: brackets-curly
+---
+
+## Introduction
+
+This style guide ensures consistency, clarity, and professionalism across all Cowboy documentation. Follow these guidelines when contributing documentation, blog posts, or technical specifications.
+
+<Tip>
+  **Goal**: Make complex blockchain technology accessible without sacrificing technical accuracy.
+</Tip>
+
+---
+
+## Formatting Conventions
+
+### Capitalization
+
+**Protocol Name**
+- "Cowboy" (always capitalized, never "cowboy" except in code)
+- "the Cowboy protocol" (lowercase "protocol")
+
+**Technical Terms**
+- **Actor** (capitalized when referring to Cowboy Actors)
+- **Runner** (capitalized when referring to off-chain compute nodes)
+- **Cycles** and **Cells** (capitalized when referring to gas units)
+- **CBY** (all caps, the token symbol)
+
+**Standard Terms** (lowercase):
+- blockchain, smart contract, validator, transaction, block
+
+**Headings**
+- Sentence case: "How to deploy an actor" ✅
+- Not title case: "How To Deploy An Actor" ❌
+
+### Abbreviations & Numbers
+
+- On first use, spell out then add abbreviation in parentheses; later use the abbreviation. Example: "Proof-of-Stake (PoS)" → "PoS".
+- Prefer concise, common abbreviations only when helpful (API, SDK, VM, CIP, PoS, DoS).
+- Numbers: spell out one to nine; use numerals for 10+ and for technical units ("3 MB", "8 cycles").
+- Use comma separators for large values ("1,000,000"). Write percentages without a space ("85%").
+
+---
+
+## Terminology Standards
+
+### Required Terms
+
+Use these specific terms consistently:
+
+| Concept | ✅ Use This | ❌ Not This |
+|---------|-------------|-------------|
+| Compute unit | **Actor** | contract, smart contract, agent |
+| Off-chain worker | **Runner** | oracle, worker, node |
+| Compute gas | **Cycles** | gas, compute units |
+| Data gas | **Cells** | bytes, data units |
+| Native token | **CBY** | Cowboy token, COWBOY |
+| Message passing | **send message** | call, invoke |
+| State storage | **storage** | state, database |
+| Scheduled execution | **timer** | cron, scheduled task |
+| Fee burning | **burn** | destroy, remove |
+
+### Technical Term Guidelines
+
+- Define a term on first use or link to the glossary.
+- Keep definitions to one short sentence; avoid duplicating glossary content.
+
+---
+
+## Code Examples
+
+### Code Block Formatting
+
+**Always Specify Language**
+````markdown
+```python
+def handler():
+    return "Hello"
+```
+````
+
+**Not**:
+````markdown
+```
+def handler():
+    return "Hello"
+```
+````
+
+**Language Tags**:
+- `python` - Actor code
+- `bash` - CLI commands
+- `json` - Configuration files
+- `yaml` - Config/data
+- `solidity` - Comparison examples
+- `rust` - Core protocol code
+
+### Code Style (Essentials)
+
+- Follow PEP 8 for Python; keep functions short and purposeful.
+- Use type hints for public APIs; prefer descriptive names over abbreviations.
+- Write comments only for non-obvious rationale; avoid restating code.
+
+### Inline Code
+
+**Use backticks** for:
+- Function names: `storage.get()`
+- Variables: `max_cycles`
+- File names: `actor.py`
+- Commands: `cowboy deploy`
+- Class names: `Actor`
+- Values: `True`, `None`, `0x1234`
+
+**Don't use** for:
+- Emphasis (use **bold**)
+- Quotation marks (use "regular quotes")
+
+---
+
+## Callouts (Keep It Light)
+
+- Use callouts sparingly for key takeaways, warnings, or tips.
+- Keep to 1–2 short sentences; prefer regular text for details.
+
+---
+
+## Images & Diagrams (Essentials)
+
+- Prefer SVG for diagrams; use PNG for screenshots.
+- Store diagrams under `docs/assets/diagrams/`; images under `docs/images/`.
+- Always include descriptive alt text; keep it to one sentence.
+
+---
+
+## Common Mistakes (Quick Fixes)
+
+- Capitalization: write "the Cowboy protocol"; capitalize proper terms like Actor, Runner, Cycles, Cells, CBY.
+- Terminology: use Cowboy terms (Actor, Runner, Cycles, Cells) instead of generic contract/oracle/gas.
+- Voice: prefer active voice ("Validators sign the block").
+- Links: avoid "here" links; use descriptive anchors (e.g., "See Actor VM overview").
+

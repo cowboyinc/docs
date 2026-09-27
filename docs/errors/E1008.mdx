@@ -1,0 +1,44 @@
+---
+title: "E1008 — Basefee too low"
+description: "Basefee too low"
+---
+
+# E1008 — Basefee too low
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1008` |
+| **Slug** | `E1008` |
+| **Category** | `gas` (Gas) |
+| **CIP** | CIP-3 |
+
+## What happened
+
+Basefee too low.
+
+## Why it happened
+
+The transaction's `max_fee_per_cycle` or `max_fee_per_cell` is below the current block basefee.
+
+## How to fix
+
+Raise `max_fee_per_cycle` and `max_fee_per_cell` above the current basefee (query via RPC).
+
+## Receipt example
+
+```json
+{
+  "code": 1008,
+  "slug": "E1008",
+  "category": "gas",
+  "what": "Basefee too low",
+  "fix": "Raise `max_fee_per_cycle` and `max_fee_per_cell` above the current basefee (query via RPC).",
+  "docs_url": "https://docs.cowboy.inc/errors/E1008"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

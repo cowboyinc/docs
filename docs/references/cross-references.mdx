@@ -1,0 +1,399 @@
+---
+title: Cross References
+description: Topic-based navigation index for Cowboy documentation and CIPs
+icon: recycle
+---
+
+## Introduction
+
+This page provides topic-based cross-references across the Cowboy documentation and the CIP (Cowboy Improvement Proposal) series. Use it as a map when you're exploring a concept that spans multiple documents.
+
+<Tip>
+  This index links to normative pages aligned with the Whitepaper and the numbered CIPs. When a CIP and a non-CIP doc disagree, the CIP is authoritative.
+</Tip>
+
+---
+
+## By Topic
+
+### Actor Model
+
+**Core concepts**:
+- [What is Cowboy](/introduction/what-is-cowboy) — Actor model introduction
+- [Actor VM Overview](/architecture/actor-vm/overview) — VM architecture
+- [Actor Identity](/architecture/actor-vm/actor-identity) — Address derivation
+- [Determinism & Sandbox](/architecture/actor-vm/determinism-and-sandbox) — Execution guarantees
+- [Resource Limits](/architecture/actor-vm/resource-limits) — VM constraints
+- [Minimal Actor Example](/architecture/actor-vm/minimal-actor)
+
+**Development**:
+- [SDK API Reference](/developers/sdk)
+- [Best Practices](/developers/best-practices) — Reentrancy, idempotency
+- [Examples](/developers/examples)
+
+**Related CIPs**:
+- [CIP-1: Actor Message Scheduler](/cips/cip-1-actor-scheduler)
+- [CIP-6: Python SDK & Actor API](/cips/cip-6-sdk)
+
+---
+
+### Gas, Fees & Metering
+
+**Fee system**:
+- [Fee Overview](/architecture/fees/overview) — Cycles & Cells
+- [Dual EIP-1559](/architecture/fees/dual-eip1559) — Dynamic basefee
+- [Metering Points](/architecture/fees/metering-points) — What gets metered where
+- [Worked Example](/architecture/fees/worked-example) — Step-by-step calculation
+
+**Economics**:
+- [Tokenomics](/economics/tokenomics)
+- [Value Flows](/economics/flows)
+- [Resource Limits](/architecture/actor-vm/resource-limits)
+
+**Related CIPs**:
+- [CIP-3: Dual-Metered Fee Model](/cips/cip-3-fee-model)
+
+---
+
+### Timers & Scheduling
+
+**Core concepts**:
+- [Scheduler Overview](/architecture/scheduler/overview)
+- [Sequence Diagram](/architecture/scheduler/sequence-diagram)
+- [DoS Parameters](/architecture/scheduler/dos-parameters)
+
+**Related CIPs**:
+- [CIP-1: Actor Message Scheduler](/cips/cip-1-actor-scheduler)
+- [CIP-5: Native Timer Mechanism](/cips/cip-5-timers)
+
+---
+
+### Off-Chain Compute & Runners
+
+**Core concepts**:
+- [Off-Chain Overview](/architecture/offchain/overview)
+- [Task Lifecycle](/architecture/offchain/lifecycle)
+- [Callback, Timeout & Challenge](/architecture/offchain/callback-timeout-challenge)
+- [Minimal Integration](/architecture/offchain/minimal-integration)
+
+**Related CIPs**:
+- [CIP-2: Verifiable Off-Chain Compute](/cips/cip-2-offchain-compute) — Task dispatch, VRF selection, commit-reveal
+- [CIP-10: Runner Container Runtime](/cips/cip-10-runner-containers) — OCI execution environment
+- [CIP-11: Runner Connectivity and Push Job Delivery](/cips/cip-11-runner-connectivity) — QUIC, presence gossip
+- [CIP-13: Runner Stake Delegation](/cips/cip-13-runner-delegation)
+
+---
+
+### Runner Storage (CBFS / RAS)
+
+**Related CIPs**:
+- [CIP-9: CBFS-Backed Runner Storage](/cips/cip-9-runner-storage) — Volumes, CapTokens, Relay Nodes, per-byte per-epoch rent
+
+---
+
+### Streaming & Data Feeds
+
+**Related CIPs**:
+- [CIP-7: Watchtower](/cips/cip-7-simple-stream-protocol) — CBQS/CBFS feeds, signed checkpoints, bounded usage authorization and predicate wake
+
+**CLI**:
+- [cowboy watchtower](/cli-specs/cowboy-watchtower)
+
+---
+
+### HTTP, DNS & Web
+
+**Related CIPs**:
+- [CIP-14: DNS-Addressable Actors](/cips/cip-14-dns-addressable-actors) — Gateway role, ingress routing, HTTP envelope
+- [CIP-15: Public Asset Hosting](/cips/cip-15-public-asset-hosting) — Static file serving from CIP-9 public volumes
+- [CIP-18: Payments](/cips/cip-18-payments) — HTTP-native payments for actors (MPP + x402, four payment models)
+- [CIP-19: Gateway MCP Ingress](/cips/cip-19-gateway-mcp-ingress) — Expose actors as MCP servers through the Gateway
+
+---
+
+### Ethereum Interoperability
+
+**Core concepts**:
+- [Technical Integration](/ethereum/technical-integration)
+
+---
+
+### Governance
+
+**Proposals & versioning**:
+- [How to Propose](/contributing/how-to-propose)
+- [Versioning Strategy](/versioning/strategy)
+- [Changelog](/versioning/changelog)
+
+**Related CIPs**:
+- [CIP-12: On-Chain Governance & System Actor Upgrades](/cips/cip-12-governance)
+
+---
+
+### Transactions & Messages
+
+**Transaction structure**:
+- [Transaction Fields](/architecture/tx/tx-fields)
+- [Transaction Format](/developers/tx-format)
+- [Idempotency](/architecture/tx/idempotency)
+- [Reentrancy](/architecture/tx/reentrancy)
+
+**Development**:
+- [Best Practices](/developers/best-practices)
+- [SDK API Reference](/developers/sdk)
+
+---
+
+### Consensus & Validators
+
+- [Design Principles](/overview/design-principles) — BFT consensus
+- [Architecture Overview](/overview/architecture) — Validator role
+- [Value Flows](/economics/flows)
+- [Resource Limits](/architecture/actor-vm/resource-limits)
+- [CIP-11: Runner Connectivity](/cips/cip-11-runner-connectivity) — Validator↔runner presence attestations
+
+---
+
+### Security
+
+**Core security**:
+- [Resource Limits](/architecture/actor-vm/resource-limits) — Multi-layered protection
+- [Best Practices](/developers/best-practices) — Secure coding
+- [Reentrancy Protection](/architecture/tx/reentrancy)
+- [Idempotency](/architecture/tx/idempotency)
+
+**VM security**:
+- [Determinism & Sandbox](/architecture/actor-vm/determinism-and-sandbox)
+- [Resource Limits](/architecture/actor-vm/resource-limits)
+
+**Economic security**:
+- [Tokenomics](/economics/tokenomics)
+
+---
+
+### Entitlements
+
+- [Entitlements Overview](/architecture/entitlements/overview)
+- [Entitlements Specification](/architecture/entitlements/entitlements-specification)
+- [CIP-2 §7](/cips/cip-2-offchain-compute) — Canonical registry, pool membership
+
+---
+
+### Economics & Tokenomics
+
+**Token economics**:
+- [Tokenomics](/economics/tokenomics)
+- [Value Flows](/economics/flows)
+- [Dual EIP-1559](/architecture/fees/dual-eip1559)
+
+**Related CIPs**:
+- [CIP-20: Fungible Token Standard](/cips/cip-20-fungible-tokens)
+- [CIP-21: DEX & Liquidity Pools](/cips/cip-21-liquidity-pools)
+- [CIP-22: Continuous Clearing Auctions](/cips/cip-22-continuous-clearing-auctions)
+- [CIP-13: Runner Stake Delegation](/cips/cip-13-runner-delegation)
+
+---
+
+### Keys & Wallets
+
+- [Key Format](/architecture/keys/key-format)
+
+---
+
+### Development
+
+**Getting started**:
+- [Quickstart](/getting-started/quickstart)
+- [Repository Layout](/getting-started/repo-layout)
+- [FAQ](/getting-started/faq)
+
+**SDK & tools**:
+- [SDK API Reference](/developers/sdk)
+- [Transaction Format](/developers/tx-format)
+- [Best Practices](/developers/best-practices)
+- [Examples](/developers/examples)
+
+**Contributing**:
+- [How to Propose](/contributing/how-to-propose)
+- [Style Guide](/style/styleguide)
+- [Naming Conventions](/assets/naming-conventions)
+
+---
+
+### Style & Terminology
+
+- [Style Guide](/style/styleguide)
+- [Glossary](/style/glossary)
+- [Naming Conventions](/assets/naming-conventions)
+- [Terminology Linting](/assets/term-lint)
+
+---
+
+## By User Type
+
+### For Developers
+
+**Essential reading**:
+1. [Quickstart](/getting-started/quickstart)
+2. [SDK Reference](/developers/sdk)
+3. [Best Practices](/developers/best-practices)
+4. [Examples](/developers/examples)
+
+**Deep dives**:
+- [Actor VM](/architecture/actor-vm/overview)
+- [Gas & Fees](/architecture/fees/overview)
+- [Timers](/architecture/scheduler/overview)
+- [Off-Chain Compute](/architecture/offchain/overview)
+- [Entitlements](/architecture/entitlements/overview)
+
+### For Runner Operators
+
+**Essential reading**:
+1. [CIP-2: Off-Chain Compute](/cips/cip-2-offchain-compute)
+2. [CIP-9: CBFS-Backed Runner Storage](/cips/cip-9-runner-storage)
+3. [CIP-10: Runner Container Runtime](/cips/cip-10-runner-containers)
+4. [CIP-11: Runner Connectivity](/cips/cip-11-runner-connectivity)
+5. [CIP-13: Runner Stake Delegation](/cips/cip-13-runner-delegation)
+
+### For Validators
+
+**Essential reading**:
+1. [Tokenomics: Validator Staking](/economics/tokenomics#staking-scope-note)
+2. [Value Flows: Block Production](/economics/flows#per-block-flow-conceptual)
+3. [Resource Limits](/architecture/actor-vm/resource-limits)
+4. [CIP-11: Runner Connectivity](/cips/cip-11-runner-connectivity) — Vote-piggybacked presence bitmap
+5. [CIP-12: Governance](/cips/cip-12-governance)
+
+### For Token Holders
+
+**Essential reading**:
+1. [Tokenomics](/economics/tokenomics)
+2. [Value Flows](/economics/flows)
+3. [CIP-12: Governance](/cips/cip-12-governance)
+4. [How to Propose](/contributing/how-to-propose)
+
+### For Researchers
+
+**Essential reading**:
+1. [What is Cowboy](/introduction/what-is-cowboy)
+2. [What is Cowboy](/introduction/what-is-cowboy)
+3. [Design Principles](/overview/design-principles)
+4. [Whitepaper](/whitepaper/cowboy-technical-whitepaper)
+
+**Technical details**:
+- [Determinism & Sandbox](/architecture/actor-vm/determinism-and-sandbox)
+- [Dual EIP-1559](/architecture/fees/dual-eip1559)
+- [VRF Selection (CIP-2)](/cips/cip-2-offchain-compute)
+- [CIP-11 Presence Bitmap](/cips/cip-11-runner-connectivity)
+
+---
+
+## By CIP
+
+### CIP-1: Actor Message Scheduler
+- [Full specification](/cips/cip-1-actor-scheduler)
+- [Scheduler Overview](/architecture/scheduler/overview)
+- [Sequence Diagram](/architecture/scheduler/sequence-diagram)
+- [DoS Parameters](/architecture/scheduler/dos-parameters)
+- [SDK Timer API](/developers/sdk)
+
+### CIP-2: Verifiable Off-Chain Compute
+- [Full specification](/cips/cip-2-offchain-compute)
+- [Off-Chain Overview](/architecture/offchain/overview)
+- [Task Lifecycle](/architecture/offchain/lifecycle)
+- [Callback Handling](/architecture/offchain/callback-timeout-challenge)
+- [Minimal Integration](/architecture/offchain/minimal-integration)
+
+### CIP-3: Dual-Metered Fee Model
+- [Full specification](/cips/cip-3-fee-model)
+- [Fee Overview](/architecture/fees/overview)
+- [Dual EIP-1559](/architecture/fees/dual-eip1559)
+- [Metering Points](/architecture/fees/metering-points)
+- [Worked Example](/architecture/fees/worked-example)
+
+### CIP-4: State Storage & Persistence
+- [Full specification](/cips/cip-4-storage)
+
+### CIP-5: Native Timer Mechanism
+- [Full specification](/cips/cip-5-timers)
+- [Scheduler Overview](/architecture/scheduler/overview)
+
+### CIP-6: Python SDK & Actor API
+- [Full specification](/cips/cip-6-sdk)
+- [SDK API Reference](/developers/sdk)
+- [Examples](/developers/examples)
+
+### CIP-7: Watchtower (Stream Protocol)
+- [Full specification](/cips/cip-7-simple-stream-protocol)
+- [CLI: cowboy watchtower](/cli-specs/cowboy-watchtower)
+
+### CIP-9: CBFS-Backed Runner Storage
+- [Full specification](/cips/cip-9-runner-storage)
+
+### CIP-10: Runner Container Runtime
+- [Full specification](/cips/cip-10-runner-containers)
+
+### CIP-11: Runner Connectivity and Push Job Delivery
+- [Full specification](/cips/cip-11-runner-connectivity)
+
+### CIP-12: On-Chain Governance & System Actor Upgrades
+- [Full specification](/cips/cip-12-governance)
+
+### CIP-13: Runner Stake Delegation
+- [Full specification](/cips/cip-13-runner-delegation)
+
+### CIP-14: DNS-Addressable Actors
+- [Full specification](/cips/cip-14-dns-addressable-actors)
+
+### CIP-15: Public Asset Hosting
+- [Full specification](/cips/cip-15-public-asset-hosting)
+
+### CIP-17: Verifiable State Read RPC
+- [Full specification](/cips/cip-17-verifiable-state-read)
+
+### CIP-18: Payments
+- [Full specification](/cips/cip-18-payments)
+
+### CIP-19: Gateway MCP Ingress
+- [Full specification](/cips/cip-19-gateway-mcp-ingress)
+
+### CIP-20: Fungible Token Standard
+- [Full specification](/cips/cip-20-fungible-tokens)
+- [Examples](/developers/examples)
+
+### CIP-21: DEX & Liquidity Pools
+- [Full specification](/cips/cip-21-liquidity-pools)
+
+### CIP-22: Continuous Clearing Auctions
+- [Full specification](/cips/cip-22-continuous-clearing-auctions)
+
+---
+
+## Quick Links
+
+**Most referenced**:
+- [Glossary](/style/glossary) — Term definitions
+- [SDK Reference](/developers/sdk) — API docs
+- [Best Practices](/developers/best-practices) — Security patterns
+- [Examples](/developers/examples) — Code samples
+- [Whitepaper](/whitepaper/cowboy-technical-whitepaper) — Technical overview
+
+**External resources**:
+- [GitHub](https://github.com/cowboyinc/cowboy) — Source code
+- [Discord](https://discord.gg/cowboy) — Community
+- [Forum](https://forum.cowboy.io) — Discussions
+- [Blog](https://blog.cowboy.io) — Updates
+
+---
+
+## Further Reading
+
+<CardGroup cols={2}>
+  <Card title="Reader Paths" icon="map" href="/introduction/reader-paths">
+    Guided reading paths for different roles
+  </Card>
+
+  <Card title="Glossary" icon="book" href="/style/glossary">
+    Term definitions
+  </Card>
+</CardGroup>

@@ -1,0 +1,126 @@
+---
+title: "Submitting Jobs to Runners"
+description: "Call LLMs, HTTP APIs, and MCP tools from actor code with runner continuations"
+icon: satellite-dish
+---
+
+## Overview
+
+Actors are deterministic and cannot reach the outside world directly. To call an LLM, fetch a URL, or invoke an MCP tool, an actor submits a **job** to the Runner network ([CIP-2](/cips/cip-2-offchain-compute)): staked off-chain nodes execute the job, results are verified, and the actor resumes with the result a few blocks later.
+
+This guide covers the developer-facing SDK. For the protocol mechanics — runner selection, verification, payment — see the [off-chain compute architecture pages](/architecture/offchain/overview).
+
+## The continuation model
+
+A job round-trip spans multiple blocks, but you write it as one `async` function:
+
+```python
+from cowboy_sdk import actor, public, capture, runner
+
+
+@actor
+class Assistant:
+    @runner.continuation
+    async def ask(self, payload):
+        question = payload.decode()
+
+        ctx = capture()          # declare what survives across the await
+        ctx.question = question
+
+        result = await runner.llm(
+            question,
+            system_prompt="You are a helpful assistant.",
+            max_tokens=512,
+            temperature=0.7,
+        )
+
+        # Everything below runs when the runner's result arrives —
+        # in a later block, as the generated `ask__resume` handler.
+        self.storage["last_answer"] = str(result)
+        return b"ok"
+```
+
+`@runner.continuation` compiles the function **at import time** into a finite state machine (FSM): the code before the `await` becomes the initial handler (submit the job, persist the continuation), and the code after it becomes a generated `ask__resume` handler invoked by the runner callback. The `await` never executes at runtime — awaiting a `runner.*` task outside a `@runner.continuation` function raises an error.
+
+Rules that follow from the FSM model:
+
+- **`capture()` is mandatory** for any local variable you need after the `await` — assign it to the returned context object (`ctx.question = ...`). Uncaptured locals are gone when the resume segment runs.
+- At most **8 sequential await points** per function (static check at compile time); an `await` inside a loop needs `@bounded_loop` and doesn't count toward the limit.
+- Expose the generated resume handler at module level, like any other handler:
+
+```python
+_INSTANCE = None
+
+def _get_actor():
+    global _INSTANCE
+    if _INSTANCE is None:
+        _INSTANCE = Assistant()
+    return _INSTANCE
+
+def ask(payload):
+    return _get_actor().ask(payload)
+
+def ask__resume(payload):
+    return _get_actor().ask__resume(payload)
+```
+
+If you route runner callbacks through a single handler instead, `runner.handle_runner_result(self, msg)` dispatches the message to the right `__resume` method based on its `reply_handler` field.
+
+## Job types
+
+| Call | What the runner does |
+|---|---|
+| `runner.llm(prompt, system_prompt=..., max_tokens=..., temperature=...)` | LLM inference |
+| `runner.http(url, method="GET", ...)` | HTTP request |
+| `runner.mcp(server, tool, *args, **kwargs)` | MCP tool call (e.g. `runner.mcp("filesystem", "read_file", path="/data/in.txt")`) |
+| `runner.agent(model, query, ...)` | Agentic LLM loop with file tools over mounted CBFS volumes (sessions, system prompts, iteration caps). SDK extension — not yet part of the CIP-2 job-type spec |
+
+Jobs can be chained — each `await` is a separate job:
+
+```python
+@runner.continuation
+async def analyze(self, msg):
+    ctx = capture()
+    ctx.page = await runner.http("https://example.com/report")
+    ctx.summary = await runner.llm(f"Summarize: {ctx.page}")
+    return ctx.summary
+```
+
+## Verification modes
+
+Off-chain results enter consensus through a verification mode declared in the job spec ([CIP-2 §9](/cips/cip-2-offchain-compute)). Which one to pick:
+
+| Mode | Runners | Use when |
+|---|---|---|
+| `None` | 1 | Development only — trust the first result |
+| `EconomicBond` | 1 | Low-stakes calls where one staked runner's bond is enough |
+| `MajorityVote` | ≥ 3 | Non-deterministic outputs with a comparable field (an answer, a price) |
+| `StructuredMatch` | ≥ 2 | Structured JSON where specific fields must agree (with tolerances) |
+| `SemanticSimilarity` | ≥ 3 | Free-text LLM output — results cluster by embedding similarity |
+| `Deterministic` | ≥ 2 | Byte-identical results required; pair with `tee_required` for attested execution |
+
+Runners whose results fail verification are penalized — reputation always, and stake slashing in protocol-defined cases. The SDK's high-level calls fill sensible defaults; the underlying job spec also carries resource bounds (output and wall-time caps), a `max_price`/tip in CBY, and a timeout in blocks, after which the job can be re-assigned.
+
+## Secrets
+
+API keys never go in actor state (chain state is public). Runners obtain credentials out-of-band: on a contributor-run local devnet you pass `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` to the runner process environment; in production, secrets live encrypted in the Secrets Manager and are released to attested runners (CIP-24).
+
+## Worked example
+
+In a full source checkout, the LLM chat example is the canonical end-to-end flow: `llm_actor.py` implements a chat actor whose `chat` handler is a `@runner.continuation` (capture → `await runner.llm(...)` → store the response and emit an event), with module-level `chat` / `chat__resume` entrypoints and a callback router using `runner.handle_runner_result`. Its helper script boots a validator plus a runner with API keys and drives a conversation.
+
+## Timeline of one job
+
+1. **Block N** — your handler runs its initial segment: the job is submitted, escrow is locked, the continuation is persisted.
+2. **Off-chain** — selected runner(s) execute the job (LLM call, HTTP fetch, ...).
+3. **Block N+k** — results are submitted and verified per the verification mode.
+4. **Block N+k+1** — the callback fires your `__resume` segment with the result; settlement then pays the runner from escrow (see the [job lifecycle](/architecture/offchain/lifecycle) for the finalization path).
+
+Plan for latency of a few blocks, and remember each leg is a separate transaction with its own gas.
+
+## Further reading
+
+- [Off-chain compute overview](/architecture/offchain/overview) — components and trust model
+- [Job lifecycle](/architecture/offchain/lifecycle) — phase-by-phase protocol walkthrough
+- [Callbacks, timeouts & challenges](/architecture/offchain/callback-timeout-challenge) — failure paths
+- [CIP-2](/cips/cip-2-offchain-compute) — authoritative spec

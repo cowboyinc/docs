@@ -1,0 +1,72 @@
+---
+title: "Block Lifecycle (Speculative Execution)"
+description: "How a Cowboy block is built, verified, and committed: the propose → verify → report model, the begin-batch → execute → fire-timers → sweep-deferred → compute-roots → cache → rollback sequence, gas lanes, and deferred transactions."
+icon: layers
+---
+
+Cowboy executes blocks **speculatively**: proposing and verifying a block runs
+its transactions against an in-memory overlay, computes the resulting roots, and
+then *rolls back* — the persistent database is only mutated later, at the commit
+(`report`) step. This page traces that flow; for how blocks are *ordered* see
+[Consensus](/architecture/consensus/overview), and for where state lives see the
+[storage model](/architecture/storage/overview).
+
+## Three phases: propose / verify / report
+
+The consensus layer drives execution through three callbacks:
+
+| Phase | What runs | Effect on persistent state |
+|---|---|---|
+| **propose** | build a candidate block: run its txs speculatively, compute roots | none (rolled back) |
+| **verify** | replay a peer's proposed block the same way; confirm the roots match | none (rolled back) |
+| **report** | the block is committed by consensus — apply the cached batch to the DB | **commits** |
+
+Both `propose` and `verify` do the *same* speculative run and discard it; only
+`report` writes. This is what lets a validator evaluate a block (and reject a bad
+one) without ever dirtying its database.
+
+## The speculative run
+
+`propose`/`verify` execute this sequence against an in-memory write-buffer
+overlay on top of the committed state:
+
+1. **begin batch** — open a speculative overlay over current committed state.
+2. **execute transactions** — per-lane selection (System / Timer / Runner / User,
+   see [consensus lanes](/architecture/consensus/overview#block-space-lanes)),
+   then VRF ordering; each tx is dispatched, metered (Cycles + Cells), and its
+   writes buffered.
+3. **fire timers** — timers whose target height is this block fire (end-of-block),
+   pre-charged to their `fee_payer`.
+4. **sweep deferred** — engine-generated deferred transactions (off-chain
+   callbacks, mailbox delivery) that are due are swept in.
+5. **compute roots** — derive the new state root (BLAKE3), tx root, and receipt
+   root from the buffered write set.
+6. **cache** — stash the computed batch + roots keyed by block.
+7. **rollback** — discard the overlay; persistent state is untouched.
+
+## report — the only commit
+
+When consensus reports the block as committed, the engine **applies the cached
+batch** (from step 6) to the persistent QMDB in one shot, and **feeds any
+produced deferred transactions back into the mempool** for a future block. No
+re-execution happens at `report` — it replays the already-computed write set,
+so commit is cheap and deterministic.
+
+## Gas lanes & metering
+
+Execution meters two independent resources — **Cycles** (compute) and **Cells**
+(data) — partitioned across the same lanes consensus uses (User / Runner / Timer
+/ System), each with its own per-block budget and EIP-1559-style basefee. See the
+[fee model](/architecture/fees/overview) for the dual-metered design and
+[metering points](/architecture/fees/metering-points) for exactly where charges
+land.
+
+## Deferred transactions
+
+Off-chain work and cross-actor mailbox delivery don't block a handler; they
+become **deferred transactions** the engine re-admits via the mempool (step 4 /
+`report`). Because that re-admission path is shared with user submission,
+admission-level filters must exempt deferred/system-origin txs — they carry
+payloads the protocol already produced, so dropping one would strand an actor's
+`await`-resume or an in-flight message. (Continuations are the developer-facing
+form of this; see the [runner continuation walkthrough](/developers/annotated-examples#3-runner-continuations).)

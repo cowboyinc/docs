@@ -1,0 +1,32 @@
+{
+  "source": "https://developers.deepgram.com/reference/speech-to-text/listen-pre-recorded",
+  "docs_version": "2026-09",
+  "endpoint": "https://api.deepgram.com/v1/listen",
+  "method": "POST",
+  "operation": "listen-pre-recorded",
+  "auth": {"in": "header", "name": "Authorization", "secret": "DEEPGRAM_API_KEY", "scheme": "Token"},
+  "idempotency": null,
+  "request_body": {"content_type": "application/json", "fields": ["url"]},
+  "query_options": ["model", "language", "punctuate", "smart_format", "diarize"],
+  "models": ["nova-3", "nova-2", "nova", "enhanced", "base", "whisper"],
+  "default_model": "nova-3",
+  "wrapper_inputs": [
+    "hire_id",
+    "url",
+    "model",
+    "language",
+    "punctuate",
+    "smart_format",
+    "diarize"
+  ],
+  "transcript_path": "results.channels[].alternatives[].transcript",
+  "metadata_fields": ["request_id", "duration", "models"],
+  "error_envelope": ["err_code", "err_msg", "error"],
+  "bounds": {
+    "max_url_chars": 2048,
+    "max_request_bytes": 8000,
+    "runner_result_bytes": 65536,
+    "result_bytes": 38000,
+    "transcript_bytes": 34000
+  }
+}

@@ -1,0 +1,103 @@
+---
+title: Propose Improvements
+description: Process for submitting CIPs (Cowboy Improvement Proposals) and other contributions
+icon: cube
+---
+
+## Introduction
+
+Cowboy is a **community-driven protocol**. Anyone can propose improvements, from minor documentation fixes to major protocol changes. This guide explains how to contribute effectively.
+
+<Tip>
+  **Open Source**: All contributions are welcome! Read this guide to understand the process.
+</Tip>
+
+## Types of Contributions (At a Glance)
+
+### 1. Documentation
+- Fixes, clarifications, examples
+- Process: open a PR
+- Typical review: 1–3 days
+
+### 2. Code
+- Bug fixes, features, optimizations
+- Process: PR with tests and docs updates
+- Checklist: tests pass, style follows, CI green
+
+### 3. CIPs (Protocol-Level)
+- Scope: consensus or normative spec changes
+- Process: follow CIP flow below
+- Typical review: multi-week (discussion → review → decision)
+
+---
+
+## CIP Process (Essentials)
+
+### What Needs a CIP?
+- Consensus changes, protocol features, metering changes
+- Standard actor interfaces, network protocol changes
+- Not needed for docs, SDK-only changes, non-normative tooling/bugfixes
+
+
+## CIP Numbers
+
+CIP numbers are permanent identifiers. Removing a proposal from the published docs does not make its number available for reuse. Check the repository history and open proposals before choosing a number.
+
+**Retired numbers:** 16.
+
+## Submitting Your CIP (Short Path)
+
+1) Discuss the idea
+- Post a "Pre-CIP" on the forum (`forum.cowboy.io`, Proposals)
+- Optional: chat in Discord `#proposals`
+- Aim for 1–2 weeks of feedback
+
+2) Draft the spec
+- Copy the template in `docs/cips/` and write CIP-X
+- Include: problem, motivation, specification, compatibility, security
+
+3) Open the PR
+- Branch: `cip/X-your-feature`
+- PR description: summary, motivation, discussion link, checklist
+
+4) Review → Decision
+- Initial check → community review → core review → last call
+- Outcome: Accepted / Needs work / Rejected (with rationale)
+
+5) Implementation (if accepted)
+- Reference implementation PR + conformance tests → testnet validation
+
+---
+
+## Review Criteria (Condensed)
+
+- Clarity: clear problem, motivation, and scope
+- Technical soundness: secure, feasible, measurable impact
+- Integration: explicit dependencies, shared schemas, and complete caller-path coverage
+- Community signal: discussion, support, and timing
+- Testing/audit: appropriate tests; audits where needed
+
+---
+
+## FAQ (Short)
+
+<AccordionGroup>
+  <Accordion title="How long does a CIP take?" icon="clock">
+    Typically several weeks: discussion → reviews → decision → (optionally) implementation/testing.
+  </Accordion>
+  
+  <Accordion title="Can I update my CIP?" icon="pen">
+    Yes, during Draft/Review. After "Final", open a new CIP for changes.
+  </Accordion>
+  
+  <Accordion title="What if it’s rejected?" icon="xmark">
+    Address feedback and resubmit later, propose an alternative, or ship as a non-consensus feature.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Thank You for Contributing!
+
+Every contribution makes Cowboy better. Whether you're fixing a typo or proposing a major protocol change, your effort is valued. 
+

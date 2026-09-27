@@ -1,0 +1,44 @@
+---
+title: "E1007 — Gas calculation overflow"
+description: "Gas calculation overflow"
+---
+
+# E1007 — Gas calculation overflow
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1007` |
+| **Slug** | `E1007` |
+| **Category** | `gas` (Gas) |
+| **CIP** | CIP-3 |
+
+## What happened
+
+Gas calculation overflow.
+
+## Why it happened
+
+The product of fee × gas_limit overflows a u128 integer.
+
+## How to fix
+
+Lower fee or `gas_limit` values so their product fits in u128.
+
+## Receipt example
+
+```json
+{
+  "code": 1007,
+  "slug": "E1007",
+  "category": "gas",
+  "what": "Gas calculation overflow",
+  "fix": "Lower fee or `gas_limit` values so their product fits in u128.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1007"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

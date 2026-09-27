@@ -1,0 +1,58 @@
+{
+  "source": "https://developers.llamaindex.ai/llamaparse/parse/guides/api-reference/",
+  "openapi": "https://api.cloud.llamaindex.ai/api/openapi.json",
+  "base_url": "https://api.cloud.llamaindex.ai",
+  "submit_endpoint": "https://api.cloud.llamaindex.ai/api/v2/parse",
+  "submit_method": "POST",
+  "result_endpoint_template": "https://api.cloud.llamaindex.ai/api/v2/parse/{job_id}?expand=markdown_content_metadata",
+  "result_method": "GET",
+  "result_expand": "markdown_content_metadata",
+  "auth": {"in": "header", "name": "Authorization", "secret": "LLAMAPARSE_API_KEY", "scheme": "Bearer", "key_prefix": "llx-"},
+  "submit_request": {
+    "required_one_of": ["source_url", "file_id"],
+    "required": ["tier", "version"],
+    "tier_enum": ["fast", "cost_effective", "agentic", "agentic_plus"],
+    "wrapper_uses": "source_url",
+    "wrapper_sends": {"tier": "cost_effective", "version": "latest"}
+  },
+  "wrapper_parse_inputs": ["hire_id", "document_url"],
+  "wrapper_fetch_inputs": ["hire_id", "request_id"],
+  "allowed_input_schemes": ["https://", "http://"],
+  "submit_response": {"fields": ["id", "status"]},
+  "result_response": {
+    "status_under": "job",
+    "result_content_metadata_at": "top_level (sibling of job)",
+    "presigned_url_path": "result_content_metadata.markdown.presigned_url",
+    "fields": ["presigned_url", "size_bytes", "exists"]
+  },
+  "job_status": {
+    "success": ["SUCCESS", "COMPLETED", "OK", "PARTIAL_SUCCESS"],
+    "pending": ["PENDING", "NOT_STARTED", "IN_PROGRESS", "PROCESSING", "RUNNING", "QUEUED"],
+    "error": ["ERROR", "FAILED", "CANCELLED"]
+  },
+  "error_envelope": "detail",
+  "key_auth_host": "api.cloud.llamaindex.ai",
+  "excluded_endpoints": [
+    "v2 GET /api/v2/parse/{id}?expand=markdown|text|items (inline content parks over the transport cap)",
+    "v1 GET /api/v1/parsing/job/{id}/result/markdown|json|text (inline content parks)",
+    "v1 POST /api/v1/parsing/upload multipart file upload (only remote document URLs are accepted)",
+    "webhook_configurations",
+    "batch/list job endpoints"
+  ],
+  "bounds": {
+    "max_url_chars": 2048,
+    "max_result_url_chars": 4096,
+    "max_job_id_chars": 64,
+    "max_id_chars": 200,
+    "max_error_chars": 500,
+    "max_request_bytes": 8000,
+    "runner_result_bytes": 65536,
+    "result_bytes": 38000
+  },
+  "unverified": [
+    "the exact v2 submit URL field name (source_url vs input_url) and that v2 accepts a remote URL at all",
+    "the exact expand param spelling and the presigned-URL response path (result_content_metadata.md.presigned_url)",
+    "the exact ParsingJob status vocabulary for parse jobs",
+    "whether v2 endpoints appear in the published /api/openapi.json (v1 confirmed present; v2 may be truncated or in a separate spec)"
+  ]
+}

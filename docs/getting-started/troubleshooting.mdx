@@ -1,0 +1,84 @@
+---
+title: "Troubleshooting"
+description: "Symptom → cause → fix, organized by where you are in the developer journey"
+icon: wrench
+---
+
+## How to debug anything on Cowboy
+
+1. **Read the receipt.** Failed transactions carry an E-code, gas usage, and often a Python traceback: `cowboy transaction status --hash <tx>` or `GET /transaction/{hash}/receipt`.
+2. **Map the E-code.** Execution errors carry stable codes — see the [error reference](/errors/overview) for the taxonomy (E1000s pre-checks through E1900s fallback).
+3. **Check node health**: `cowboy status` (height, mempool, basefee) and `GET /health/detailed`.
+
+The sections below cover the failures people actually hit, in journey order.
+
+## Devnet won't connect
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `connection refused` or timeout | CLI is pointed at an unavailable RPC URL | Run `cowboy status`; re-run `cowboy init dev` for hosted devnet, or pass `--rpc-url` explicitly |
+| Local validator exits immediately, or `connection refused` on `:4000` | Contributor/local devnet is not running, or RPC port is taken | Check your local validator process and port; source-checkout devnet tooling is separate from the public Quickstart |
+| Stale state weirdness after local restarts | Leftover local validator state | Reset using the local-devnet tooling from your source workspace |
+| `429 Too Many Requests` while scripting | Global rate limit (default 100 req/s) | Back off, or raise `RPC_GLOBAL_RATE_LIMIT_PER_SEC` on your own devnet |
+
+## Wallet and CLI
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Failed to load private key` / key not found | No key at any lookup location | Key resolution is `--private-key` → `COWBOY_PRIVATE_KEY` → the active environment's `key_file` → `.cowboy/key`. Run `cowboy init dev` to scaffold, or `cowboy wallet create` |
+| Insufficient balance (E1003/E1004) | Account unfunded, or balance can't cover `gas_limit × basefee` | Devnet: faucet (`cowboy init` funds you automatically when the faucet is available, or `POST /faucet`). Otherwise `cowboy transfer` from a funded account; check with `cowboy wallet balance` |
+| Nonce mismatch (E1002) | Tx nonce ≠ account nonce (parallel submissions, stale cache) | `cowboy account nonce --address <addr>`, resubmit; serialize submissions per account |
+| CLI hits the wrong network | Env/flag overriding project config | Remember the precedence: `--rpc-url` flag beats `COWBOY_RPC_URL` beats `.cowboy/config.json` |
+
+## Deploying actors
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Invalid salt hex` | `--salt` must be a hex string (≤ 32 bytes) | Use e.g. `--salt 0x01`, not an arbitrary name |
+| Non-deterministic code rejected (E1101) | Banned import (`os`, `pickle`, `datetime`, `ctypes`, …) or banned pattern (`asyncio.gather`, giant integer literal) | See the [PVM rules](/architecture/actor-vm/determinism-and-sandbox); use `runtime` APIs for time/randomness and `runner.*` continuations for I/O |
+| Out of Cycles / Cells at deploy (E1005/E1006) | `init` work exceeds default limits | Raise `--cycles-limit` / `--cells-limit` on the deploy; trim `init` |
+| Basefee too low (E1008) | Network basefee moved above your max fee | Check `cowboy status` for current basefees and raise `--max-fee-per-cycle` / `--max-fee-per-cell` |
+
+## Executing handlers
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Handler not found | Handler name typo, or no module-level entrypoint | Handlers are dispatched by top-level function name — confirm the module-level wrapper exists; check `cowboy actor get` |
+| Permission denied (E1211) | SDK handlers are deny-by-default | Mark the handler `@public` (or `@callable_by(...)`), or call from an authorized address |
+| Out of gas mid-execution (E1201 / E1005 / E1006) | Cycles or Cells exhausted; storage reads settle *after* execution, so read-heavy handlers can fail late | Raise limits on the execute call; batch reads; trim returned data (1 Cell/byte) |
+| Invalid input (E1202) | Address not 20 bytes, malformed CBOR payload | Encode payloads with `cowboy_sdk.codec`; pass addresses as 20-byte hex |
+| Generic PVM error with traceback (E1210) | Unhandled Python exception in the handler | Read the traceback in the receipt; reproduce off-chain with the [SimulatedChain test harness](/developers/sdk) |
+| Token transfer silently blocked, hook at fault (E1408 / E1411 / E1412) | `can_transfer` hook rejected (fail-closed — anything but `"true"`/`"1"`/JSON `true` rejects), or blew its 50k Cycle cap (E1411) / 50k Cell cap (E1412) | Inspect the hook actor's logic; keep hooks tiny |
+
+## Runner jobs
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Runner not found (E1602) | Daemon's address never registered | Fund the runner address, then `cowboy runner register --stake 50000` |
+| Insufficient stake at registration (E1603) | Stake below the minimum, or below 1.5× the runner's declared maximum job value | Register with a larger `--stake`, or declare a lower max job value |
+| Job stuck `pending` | No registered runner matches the job's requirements or covers its price at 1.5× stake (under-staked runners are silently filtered from candidacy — no error is raised) | `curl /runners/active`; start/register a matching, sufficiently staked runner; check its heartbeats |
+| LLM jobs fail on the runner | Missing executor credentials | Set `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` in the runner daemon's environment |
+| No consensus / threshold not met (E1608/E1609) | Runners disagreed, or too few submitted before the deadline | Add runners; pick a verification mode suited to non-deterministic output (see [verification modes](/architecture/offchain/callback-timeout-challenge)) |
+| Callback never fires | Job still unverified, or callback handler name doesn't match | `GET /job/{id}/status`; confirm the actor exposes the resume/callback handler at module level |
+
+## Reading the E-code taxonomy
+
+| Range | Domain |
+|---|---|
+| E1000–E1099 | Transaction pre-checks (signature, nonce, balance, basefee) |
+| E1100–E1199 | Static code validation |
+| E1200–E1299 | PVM runtime / host API |
+| E1300–E1399 | Entitlements / manifests |
+| E1400–E1499 | CIP-20 tokens & transfer hooks |
+| E1500–E1599 | Timers, deferred, commit-reveal |
+| E1600–E1699 | Runners, jobs, verification consensus |
+| E1700–E1899 | Secrets (CBSS) & Watchtower streams (defined in the node; per-code pages not yet published) |
+| E1900–E1999 | Unclassified fallback — report it with the tx hash |
+
+Most codes have a dedicated page with causes and remedies: [error reference](/errors/overview).
+
+## Still stuck?
+
+- The [Quickstart troubleshooting accordions](/getting-started/quickstart) cover first-run issues (PATH, config pointing at the wrong RPC, devnet funding).
+- The [FAQ](/getting-started/faq) answers conceptual "why does it work this way" questions.
+- For protocol-level behavior, the [CIP specs](/cips/cip-1-actor-scheduler) are authoritative.

@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""Fake cbfs CLI for adapter tests: a JSON file per state dir simulates the
+volume; `tx` enforces --expect-root; every invocation is logged."""
+import base64, hashlib, json, os, sys
+
+args = sys.argv[1:]
+assert args[0] == "--json" and args[1] == "--state-dir", args
+root_dir = args[2]; rest = args[3:]
+if rest[:1] == ["--rpc-url"]:
+    rest = rest[2:]
+logged = list(rest)
+if rest[:1] == ["--trusted-checkpoint"]:
+    rest = rest[2:]
+os.makedirs(root_dir, exist_ok=True)
+state_path = os.path.join(root_dir, "fake-volume.json")
+log_path = os.path.join(root_dir, "calls.log")
+state = json.load(open(state_path)) if os.path.exists(state_path) else {"files": {}}
+with open(log_path, "a") as f:
+    f.write(json.dumps(logged) + "\n")
+assert os.environ.get("CBFS_PENDING_DIFF_DIR") == os.path.join(root_dir, "pending-diffs"), os.environ.get("CBFS_PENDING_DIFF_DIR")
+
+def root_of(files):
+    h = hashlib.sha256()
+    for k in sorted(files):
+        h.update(k.encode() + b"\0" + hashlib.sha256(base64.b64decode(files[k])).digest())
+    return h.hexdigest()
+
+cmd = rest[0]
+if os.environ.get("FAKE_CBFS_429_TIMES"):
+    counter = os.path.join(root_dir, "429-count")
+    n = int(open(counter).read()) if os.path.exists(counter) else 0
+    if n < int(os.environ["FAKE_CBFS_429_TIMES"]):
+        open(counter, "w").write(str(n + 1))
+        msg = os.environ.get("FAKE_CBFS_TRANSIENT_MSG", "error: discovering RAS write relayers from chain registry: http error: HTTP status client error (429 Too Many Requests)")
+        sys.stderr.write(msg + "\n"); sys.exit(1)
+if cmd == "root":
+    print(json.dumps({"volume": rest[1], "manifest_root": root_of(state["files"])}))
+elif cmd == "ls":
+    prefix = rest[2] if len(rest) > 2 else ""
+    print(json.dumps([{"path": k, "size_bytes": len(base64.b64decode(v)), "content_hash": "00"} for k, v in sorted(state["files"].items()) if k.startswith(prefix)]))
+elif cmd == "cat":
+    path = rest[2]
+    if os.environ.get("FAKE_CBFS_NETWORK_FAIL"):
+        sys.stderr.write("error: http error: connection refused (object not found in cache)\n"); sys.exit(1)
+    if path not in state["files"]:
+        sys.stderr.write("error: object not found\n"); sys.exit(4)
+    if os.environ.get("FAKE_CBFS_HUGE"):
+        sys.stdout.buffer.write(b"x" * int(os.environ["FAKE_CBFS_HUGE"])); sys.exit(0)
+    sys.stdout.buffer.write(base64.b64decode(state["files"][path]))
+elif cmd == "tx":
+    name, expect = rest[1], rest[rest.index("--expect-root") + 1]
+    batch = json.load(sys.stdin)
+    busy = os.path.join(root_dir, "busy-once")
+    if os.environ.get("FAKE_CBFS_BUSY_ONCE") and not os.path.exists(busy):
+        open(busy, "w").close()
+        sys.stderr.write("error: tx: committing: commit error: manifest commit-v2 failed: HTTP status client error (429 Too Many Requests)\n"); sys.exit(1)
+    marker = os.path.join(root_dir, "moved-once")
+    if os.environ.get("FAKE_CBFS_MOVE_ROOT") and not os.path.exists(marker):
+        open(marker, "w").close()  # simulate one concurrent writer landing first
+        state["files"]["__intruder"] = base64.b64encode(b"x").decode()
+        json.dump(state, open(state_path, "w"))
+    if root_of(state["files"]) != expect:
+        sys.stderr.write("tx: conflict\n"); sys.exit(3)
+    for p in batch["puts"]:
+        state["files"][p["remote"]] = p["data_b64"]
+    for p in batch["removes"]:
+        state["files"].pop(p, None)
+    json.dump(state, open(state_path, "w"))
+    print(json.dumps({"volume": name, "prev_root": expect, "manifest_root": root_of(state["files"]), "puts": len(batch["puts"]), "removes": len(batch["removes"])}))
+elif cmd == "volume" and rest[1] == "allow":
+    if os.environ.get("FAKE_CBFS_ALLOW_FAIL"):
+        sys.stderr.write("error: chain refused\n"); sys.exit(1)
+    print(json.dumps({"ok": True}))
+else:
+    sys.stderr.write(f"unknown {rest}\n"); sys.exit(2)

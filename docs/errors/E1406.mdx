@@ -1,0 +1,44 @@
+---
+title: "E1406 — Not authorized for this token operation"
+description: "Not authorized for this token operation"
+---
+
+# E1406 — Not authorized for this token operation
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1406` |
+| **Slug** | `E1406` |
+| **Category** | `token` (Token (CIP-20)) |
+| **CIP** | CIP-20 |
+
+## What happened
+
+Not authorized for this token operation.
+
+## Why it happened
+
+The caller is not the token admin or authority.
+
+## How to fix
+
+Only the token admin/authority may perform this operation.
+
+## Receipt example
+
+```json
+{
+  "code": 1406,
+  "slug": "E1406",
+  "category": "token",
+  "what": "Not authorized for this token operation",
+  "fix": "Only the token admin/authority may perform this operation.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1406"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

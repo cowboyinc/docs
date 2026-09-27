@@ -1,0 +1,44 @@
+---
+title: "E1514 — Runner already committed for this job"
+description: "Runner already committed for this job"
+---
+
+# E1514 — Runner already committed for this job
+
+| Property | Value |
+|----------|-------|
+| **Code** | `1514` |
+| **Slug** | `E1514` |
+| **Category** | `commit_reveal` (Commit-Reveal) |
+
+
+## What happened
+
+Runner already committed for this job.
+
+## Why it happened
+
+This runner has already submitted a commitment for the specified job.
+
+## How to fix
+
+Only one commitment per runner per job is allowed.
+
+## Receipt example
+
+```json
+{
+  "code": 1514,
+  "slug": "E1514",
+  "category": "commit_reveal",
+  "what": "Runner already committed for this job",
+  "fix": "Only one commitment per runner per job is allowed.",
+  "docs_url": "https://docs.cowboy.inc/errors/E1514"
+}
+```
+
+---
+
+<Card title="All Error Codes" icon="list" href="/errors/overview">
+  View the complete error code reference
+</Card>

@@ -1,0 +1,260 @@
+---
+title: Worked Fee Example
+description: Complete transaction cost calculation with detailed breakdown
+---
+
+## Introduction
+
+This document provides a complete, step-by-step example of calculating the cost of a Cowboy transaction. We'll walk through a real-world scenario with detailed breakdowns of both Cycles and Cells consumption.
+
+<Tip>
+  **Goal**: Understand exactly where costs come from and how to estimate fees for your transactions.
+</Tip>
+
+> Note: Examples and code snippets in this page are conceptual and illustrative (non-normative). Normative metering rules and formulas follow CIP-3. Final interfaces and naming should follow the SDK and Developer Guide.
+
+## Example Scenario
+
+### The Task
+
+An actor receives a message to process sentiment analysis on a batch of tweets:
+
+```python
+# Conceptual example (non-normative)
+class SentimentProcessor:
+    def process_tweets(self, tweets):
+        """
+        Process multiple tweets for sentiment analysis.
+        
+        Steps:
+        1. Load configuration from storage
+        2. Submit off-chain analysis tasks
+        3. Store pending task IDs
+        4. Send confirmation message
+        5. Return task IDs
+        """
+        # Load config (conceptual storage API)
+        config = storage_get("config")
+        
+        # Process each tweet
+        task_ids = []
+        for tweet in tweets:
+            # Submit off-chain task (conceptual; CIP-2 Dispatcher)
+            task_id = submit_offchain_task(
+                task_definition={"model": "sentiment", "input": tweet},
+                result_schema={"max_return_bytes": 1024},
+                num_runners=3,
+                payment_per_runner=100
+            )
+            task_ids.append(task_id)
+        
+        # Store pending tasks (conceptual storage API)
+        storage_set("pending_tasks", task_ids)
+        
+        # Send confirmation to caller (conceptual messaging API)
+        send(to=caller(), handler="on_processing_started", data={"task_ids": task_ids})
+        
+        return task_ids
+```
+The actor performs, in order: (1) read configuration, (2) submit off‑chain tasks via the CIP‑2 Dispatcher (with a result_schema), (3) persist pending task IDs, (4) send a confirmation message, and (5) return task IDs. The following sections show how to account for Cycles and Cells at each step without relying on implementation‑specific APIs.
+
+### Transaction Parameters
+
+```python
+Transaction:
+  caller: 0xAlice...
+  actor: 0xSentimentProcessor...
+  handler: "process_tweets"
+  payload: {
+      "tweets": [
+          "Cowboy protocol is amazing!",
+          "Just deployed my first actor",
+          "The fee model is so fair"
+      ]
+  }
+  max_fee_per_cycle: 150 wei
+  tip_per_cycle: 15 wei
+  max_fee_per_cell: 80 wei
+  tip_per_cell: 8 wei
+
+Current Network State:
+  basefee_cycle: 120 wei
+  basefee_cell: 60 wei
+  block_height: 10,000
+```
+
+## Step-by-Step Cost Calculation
+
+### Phase 1: Intrinsic Calldata (Cells)
+
+**Before execution**, charge for transaction payload:
+
+Intrinsic calldata Cells = serialized_payload_size (bytes), charged before VM execution.
+
+**Cells at this point**: 150
+
+### Phase 2: Function Call Setup (Cycles)
+
+Representative cycle costs per CIP‑3: function call (10), parsing cost proportional to payload size.
+
+**Cycles at this point**: 10 + 160 = 170
+
+### Phase 3: Load Configuration (Cycles + Cells)
+
+Storage read costs cycles (e.g., 10); reads do not charge Cells. Deserialization cycles depend on object size.
+
+**Cycles**: 170 + 30 = 200  
+**Cells**: 150 (no change)
+
+### Phase 4: Process Tweets Loop
+
+#### Iteration 1: First Tweet
+
+Per item: loop/control overhead (cycles), data structure access (cycles), CIP‑2 task submission (cycles for call and serialization), and Cells for any data written/committed. Precisely size‑dependent numbers are determined by payload length and schema sizes.
+
+**Cycles**: 200 + 339 = 539  
+**Cells**: 150 + 98 = 248
+
+#### Iteration 2: Second Tweet
+
+Accumulate cycles and cells per iteration; totals grow linearly with items processed (plus any expansions/overheads).
+
+**Cycles**: 539 + 339 = 878  
+**Cells**: 248 + 100 = 348
+
+#### Iteration 3: Third Tweet
+
+Accumulate cycles and cells per iteration; totals grow linearly with items processed (plus any expansions/overheads).
+
+**Cycles**: 878 + 339 = 1,217  
+**Cells**: 348 + 96 = 444
+
+### Phase 5: Store Pending Tasks
+
+Storage write: cycles for call + serialization; Cells = len(key) + len(value) per CIP‑3.
+
+**Cycles**: 1,217 + 134 = 1,351  
+**Cells**: 444 + 78 = 522
+
+### Phase 6: Send Message
+
+Message send: base cycles (e.g., 80) plus serialization cycles; Cells charged by message payload size.
+
+**Cycles**: 1,351 + 140 = 1,491  
+**Cells**: 522 + 40 = 562
+
+### Phase 7: Return Value
+
+Return data: cycles for serialization, Cells equal to serialized return size.
+
+**Cycles**: 1,491 + 44 = 1,535  
+**Cells**: 562 + 24 = 586
+
+### Phase 8: Cleanup & Finalization
+
+Cleanup includes function return cycles and deterministic refcount destruction cycles (CIP‑3); totals are the sum of all prior phases.
+
+**Cycles**: 1,535 + 2 + 5 = 1,542  # cycles
+**Cells**: 586  # Cells
+
+## Summary of Costs
+
+### Resource Usage Breakdown
+
+<Tabs>
+  <Tab title="Cycles (Computation)">
+    | Operation | Cycles (symbolic) |
+    |-----------|-------------------:|
+    | Function call & setup | f_call + parse(payload) |
+    | Load configuration | read + deserialize(config) |
+    | Process items (n× loop) | n × (loop_overheads + submission + serialization) |
+    | Store pending tasks | write + serialize(value) |
+    | Send message | send_base + serialize(message) |
+    | Return value | serialize(return) |
+    | Cleanup | return + refcount_destruction |
+    | **TOTAL** | **Σ above** |
+  </Tab>
+  
+  <Tab title="Cells (Data/Storage)">
+    | Operation | Cells (bytes) |
+    |-----------|----------------:|
+    | Intrinsic calldata | len(payload) |
+    | Task submissions (n×) | Σ len(task_defs) + len(schemas) |
+    | List/container expansions | by allocated bytes |
+    | Storage write | len(key) + len(value) |
+    | Send message | len(message_payload) |
+    | Return data | len(serialize(return)) |
+    | **TOTAL** | **Σ above** |
+  </Tab>
+</Tabs>
+
+**Final Resource Usage**:
+- **Cycles**: 1,542
+- **Cells**: 610
+
+### Fee Calculation
+
+Using current network state:
+Use current basefees for Cycles and Cells; the user specifies max_fee_per_* and tip_per_* per resource.
+
+#### Cycle Fees
+
+Cycle fees: basefee portion = cycles_used × basefee_cycle; tip portion = cycles_used × min(tip_per_cycle, max_fee_per_cycle − basefee_cycle); total = sum.
+
+#### Cell Fees
+
+Cell fees follow the same formula per resource: basefee portion = cells_used × basefee_cell; tip portion = cells_used × min(tip_per_cell, max_fee_per_cell − basefee_cell); total = sum.
+
+#### Total Transaction Fee
+
+Total transaction fee = total_cycle_cost + total_cell_cost. Basefee portions are burned; tips are paid to the producer.
+
+### Fee Distribution
+
+Fee distribution: Basefee portions (Cycles/Cells) are 100% burned; tips (Cycles/Cells) go to the block producer.
+
+## Comparison: Traditional vs. Dual-Metered
+
+### If This Were Ethereum-Style (Single Gas)
+
+In single‑gas systems, a unified price masks resource differences, causing cross‑subsidies and less predictable costs.
+
+### Cowboy Dual-Metered
+
+Dual metering prices compute and data independently: fairer, more predictable, and decoupled markets.
+
+## Cost Optimization Strategies
+
+### Optimize Cycles
+
+Best practices: batch operations, cache judiciously within deterministic constraints, and minimize repeated serialization.
+
+### Optimize Cells
+
+For Cells: compress data where possible, minimize return payloads, and batch storage writes to reduce per‑call overhead.
+
+## Fee Estimation Tool
+
+Fee estimation should be based on expected Cycles and Cells derived from code paths and data sizes; apply current basefees and chosen tips per resource.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Fee Overview" icon="money-bill" href="/architecture/fees/overview">
+    Introduction to dual-metered gas
+  </Card>
+  <Card title="Dual EIP-1559" icon="chart-line" href="/architecture/fees/dual-eip1559">
+    Basefee adjustment mechanism
+  </Card>
+  <Card title="Best Practices" icon="lightbulb" href="/developers/best-practices">
+    Gas optimization techniques
+  </Card>
+  <Card title="CIP-3 Specification" icon="file-lines" href="#">
+    Complete cost tables
+  </Card>
+</CardGroup>
+
+## Further Reading
+
+- [Metering Points Reference](/architecture/fees/metering-points)
+- [Actor VM Overview](/architecture/actor-vm/overview)
