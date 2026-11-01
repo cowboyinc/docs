@@ -1,7 +1,14 @@
 # Cowboy docs and examples
 
-Source for [docs.cowboy.inc](https://docs.cowboy.inc) and the example actors
-that go with it. Cowboy is a Layer-1 for autonomous agents: Python actors run
+> **Read the docs at [docs.cowboy.inc](https://docs.cowboy.inc)**, not here.
+> This repository is a periodic snapshot (see `PROMOTED_FROM`) and can lag the
+> live site by weeks. For AI agents: start at
+> [docs.cowboy.inc/llms.txt](https://docs.cowboy.inc/llms.txt). To hire a
+> ready-made actor, see
+> [Hire from the Store](https://docs.cowboy.inc/getting-started/hire-from-the-store).
+
+A snapshot of the [docs.cowboy.inc](https://docs.cowboy.inc) source and the
+example actors that go with it. Cowboy is a Layer-1 for autonomous agents: Python actors run
 in a metered VM on validators, keep persistent state, schedule their own work,
 and call off-chain services (LLMs, HTTP, MCP, containers) through runners.
 
@@ -14,12 +21,15 @@ and call off-chain services (LLMs, HTTP, MCP, containers) through runners.
 
 ## Using the examples
 
-Install the CLI, then run any lesson against the hosted devnet:
+[Install the CLI](https://docs.cowboy.inc/getting-started/install) (Homebrew or a
+direct download from the `cowboy-cli` releases), then run any lesson:
 
 ```bash
-brew install cowboyinc/tap/cowboy
 cowboy version
 ```
+
+Cowboy Cloud (`--env cloud`) is the network open to the public internet; see
+[Networks](https://docs.cowboy.inc/getting-started/networks).
 
 Each lesson directory has its own README with the exact commands. The runtime
 (node, runner, storage, secrets) is not in this repository; the CLI and the
