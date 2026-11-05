@@ -72,7 +72,6 @@
           "developers/your-first-actor",
           "architecture/actor-vm/minimal-actor",
           "developers/testing-actors",
-          "developers/working-with-tokens",
           "developers/submitting-jobs",
           "developers/runtime-api",
           "developers/sdk",
@@ -163,7 +162,6 @@
               "architecture/keys/key-format"
             ]
           },
-          "economics/tokenomics",
           "economics/flows",
           "ethereum/technical-integration"
         ]
@@ -306,6 +304,14 @@
     }
   },
   "redirects": [
+    {
+      "source": "/developers/working-with-tokens",
+      "destination": "/cips/cip-20-fungible-tokens"
+    },
+    {
+      "source": "/economics/tokenomics",
+      "destination": "/economics/flows"
+    },
     {
       "source": "/quickstart",
       "destination": "/getting-started/quickstart"
