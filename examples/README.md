@@ -30,31 +30,6 @@ project.
 checks the node's actor runtime profile: use the CLI release that matches
 the network you target.
 
-## Project Layout And Local Simulation
-
-Every core lesson is a `cowboy init` project: `cowboy.toml`, one target per
-`actors/<name>/main.py`, and `tests/` driving the actor through
-`cowboy_sdk.testing.SimulatedChain`. From a lesson directory:
-
-```bash
-uv run pytest                          # SimulatedChain tests, no node
-cowboy actor check <target>            # compile the target offline
-cowboy test --target <target> --handler <h> --payload 0x.. --expect 0x..
-./demo.sh                              # deploy the targets to a network and walk the lesson
-```
-
-`cowboy test` and `cowboy dev` run a handler on the simulated PVM through
-`cowboy-dev-runner` (`cargo build --release -p cowboy-dev-runner` in a node
-checkout; set `COWBOY_DEV_RUNNER` if it is not on `PATH`). The tests import
-`cowboy_sdk` from a node checkout beside this repository until `cowboy-sdk`
-0.1.2 is on PyPI; set `COWBOY_SDK_PATH` to point elsewhere (see
-`_sdk_path.py`). `./check_projects.sh [--pytest]` runs the checks over every
-project.
-
-`demo.sh` deploys by target name (`cowboy actor deploy <target>`), which
-checks the node's actor runtime profile: use the CLI release that matches
-the network you target.
-
 ## Fast Path
 
 If you want to build something interesting quickly, run these first:
